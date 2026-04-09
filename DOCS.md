@@ -481,6 +481,73 @@ GeoJSON sources and layers are only added to the map after all three complete, e
 
 ---
 
+## Map Rendering
+
+### PMTiles and local tiles
+
+The map is rendered entirely from a local vector tile archive (`tiling/syracuse.pmtiles`) with no CDN dependency. The file was produced from an [OpenMapTiles](https://openmaptiles.org/) MBTiles export using the `pmtiles convert` CLI:
+
+```bash
+pmtiles convert osm-2020-02-10-v3.11_new-york_syracuse.mbtiles syracuse.pmtiles
+```
+
+PMTiles is a single-file archive format for map tiles. Instead of a server endpoint per tile, the browser fetches byte ranges from one file using HTTP `Range` requests — the same mechanism used for video seeking. The `pmtiles` JS library handles range request dispatch and tile decompression transparently.
+
+The PMTiles protocol is registered before the map is created:
+
+```js
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
+```
+
+After this, any MapLibre source URL beginning with `pmtiles://` is intercepted by the protocol handler, which issues `Range` requests to the local file and returns decompressed tile buffers to MapLibre's renderer.
+
+> **Local development note:** Python's built-in `http.server` does not support `Range` requests. Use `serve.py` (included in the repo) instead.
+
+### MapLibre GL JS style
+
+The map uses an inline style object (no external style URL) with layers targeting the OpenMapTiles vector schema. The style includes:
+
+- **Background** — warm tan (`#e8e0d8`), matching Google Maps' base colour
+- **Water** — `aad3df` blue fill + waterway lines
+- **Green areas** — `landcover` (wood, grass) and `landuse` (parks) layers in muted green
+- **Buildings** — light tan fill with subtle outline
+- **Roads** — rendered in pairs: a wider *casing* layer (slightly darker, drawn first) and a narrower *fill* layer on top. This creates the classic road-on-background effect without needing a separate road-background polygon layer:
+  - Minor roads: tan casing + white fill
+  - Secondary/tertiary: slightly darker casing + white fill
+  - Primary/trunk: golden casing + pale yellow fill
+  - Motorways: orange casing + amber fill
+- **Road labels** — `transportation_name` symbol layer, `Open Sans Regular` font, line-following placement (`symbol-placement: line`), min zoom 13
+
+All road width values use `interpolate` expressions to scale smoothly with zoom level.
+
+### Local glyph files
+
+Map labels require glyph PBF files — pre-rendered font bitmaps for each unicode range. These are served locally from `lib/glyphs/Open Sans Regular/` (256 files covering the full unicode range, ~2 MB total). The style references them as:
+
+```js
+glyphs: './lib/glyphs/{fontstack}/{range}.pbf'
+```
+
+MapLibre fetches only the ranges it actually needs for the characters present in visible labels.
+
+### Local development server
+
+PMTiles requires HTTP `Range` requests. `serve.py` is a minimal Python HTTP server that handles range headers correctly:
+
+```python
+class RangeHandler(SimpleHTTPRequestHandler):
+    def send_head(self):
+        ...
+        if range_header:
+            # parse bytes=start-end, seek to start, return LimitedFile(f, length)
+            ...
+```
+
+The key detail is wrapping the file object in a `_LimitedFile` that caps reads to exactly `Content-Length` bytes — Python's default `copyfile` would otherwise stream the full remainder of the file past the range end, causing the PMTiles library to reject the response.
+
+---
+
 ## Front-End Routing Flow
 
 Once the WASM module is initialised, a route request follows this sequence:
