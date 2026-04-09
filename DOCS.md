@@ -10,14 +10,19 @@
 3. [Navigation Engine (Rust/WASM)](#navigation-engine-rustwasm)
    - [Graph representation](#graph-representation)
    - [Dijkstra's algorithm](#dijkstras-algorithm)
-   - [Hill penalty](#hill-penalty)
+   - [Hill penalty and fitness slider](#hill-penalty-and-fitness-slider)
    - [Nearest-node lookup](#nearest-node-lookup)
 4. [WASM Build and Loading](#wasm-build-and-loading)
    - [Compiling with wasm-pack](#compiling-with-wasm-pack)
    - [Generated JS glue layer](#generated-js-glue-layer)
    - [Loading in the browser](#loading-in-the-browser)
-5. [Front-End Routing Flow](#front-end-routing-flow)
-6. [Data Schema Reference](#data-schema-reference)
+5. [Map Rendering](#map-rendering)
+   - [PMTiles and local tiles](#pmtiles-and-local-tiles)
+   - [MapLibre GL JS style](#maplibre-gl-js-style)
+   - [Local glyph files](#local-glyph-files)
+   - [Local development server](#local-development-server)
+6. [Front-End Routing Flow](#front-end-routing-flow)
+7. [Data Schema Reference](#data-schema-reference)
 
 ---
 
@@ -211,7 +216,7 @@ struct Edge {
 
 ### Dijkstra's algorithm
 
-`route(from_id, to_id, avoid_hills)` runs a standard single-source shortest-path search using a binary min-heap.
+`route(from_id, to_id, hill_factor)` runs a standard single-source shortest-path search using a binary min-heap.
 
 #### Min-heap ordering
 
@@ -243,7 +248,8 @@ while let Some(HeapItem { cost: d, idx: u }) = heap.pop() {
     if d > dist[u as usize] { continue; } // stale heap entry — skip
 
     for (ei, edge) in g.adj[u].iter().enumerate() {
-        let penalty = if avoid_hills { hill_penalty(edge.grade) } else { 1.0 };
+        // hill_factor 0.0 = no penalty, 1.0 = full penalty
+        let penalty = 1.0 + (hill_penalty(edge.grade) - 1.0) * hill_factor;
         let nd = d + edge.cost * penalty;
         let v = edge.to_idx as usize;
         if nd < dist[v] {
