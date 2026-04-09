@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Syracuse Low-Stress Bike Router</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #3fb950;
+    --accent2: #58a6ff;
+    --warn: #f0883e;
+    --danger: #f85149;
+    --lts1: #3fb950;
+    --lts2: #e3b341;
+    --lts3: #f85149;
+  }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    padding: 10px 18px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+    z-index: 1000;
+  }
+
+  header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: var(--accent);
+  }
+
+  .badge {
+    font-size: 0.65rem;
+    padding: 2px 7px;
+    border-radius: 2px;
+    background: rgba(63,185,80,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(63,185,80,0.3);
+    letter-spacing: 0.08em;
+  }
+
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  #sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 999;
+  }
+
+  .sidebar-scroll {
+    overflow-y: auto;
+    flex: 1;
+    padding: 16px;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+  .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+  .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .section-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .input-group {
+    margin-bottom: 12px;
+  }
+
+  .input-group label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .addr-wrap {
+    position: relative;
+  }
+
+  .addr-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 7px 10px;
+    font-size: 0.72rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--text);
+    min-height: 32px;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  .addr-input::placeholder { color: var(--muted); }
+
+  .addr-input.set-a {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .addr-input.set-b {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  .addr-input:focus {
+    border-color: var(--muted);
+    color: var(--text);
+  }
+
+  .suggestions {
+    display: none;
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0; right: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    z-index: 2000;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .suggestions.open { display: block; }
+
+  .suggestion-item {
+    padding: 7px 10px;
+    font-size: 0.68rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    line-height: 1.4;
+  }
+
+  .suggestion-item:last-child { border-bottom: none; }
+
+  .suggestion-item:hover, .suggestion-item.active {
+    background: rgba(255,255,255,0.05);
+  }
+
+  .suggestion-item .sug-name { color: var(--text); }
+  .suggestion-item .sug-detail { color: var(--muted); font-size: 0.62rem; }
+
+  .btn-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  button {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    padding: 7px 12px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-mode {
+    background: transparent;
+    color: var(--muted);
+    flex: 1;
+  }
+
+  .btn-mode.active-a {
+    background: rgba(63,185,80,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-mode.active-b {
+    background: rgba(88,166,255,0.15);
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  .btn-route {
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 500;
+    padding: 9px;
+    margin-bottom: 10px;
+    font-size: 0.75rem;
+  }
+
+  .btn-route:hover { opacity: 0.85; }
+
+  .btn-clear {
+    width: 100%;
+    background: transparent;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding: 6px;
+    font-size: 0.68rem;
+  }
+
+  .btn-clear:hover { color: var(--danger); border-color: var(--danger); }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 14px 0;
+  }
+
+  .stress-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  .legend-swatch {
+    width: 28px;
+    height: 4px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .toggle-label {
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  .toggle {
+    width: 34px;
+    height: 18px;
+    background: var(--border);
+    border-radius: 9px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    border: none;
+  }
+
+  .toggle.on { background: var(--accent); }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: white;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.2s;
+  }
+
+  .toggle.on::after { transform: translateX(16px); }
+
+  #results {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    font-size: 0.68rem;
+    color: var(--muted);
+    min-height: 60px;
+    margin-bottom: 10px;
+    line-height: 1.6;
+  }
+
+  .result-stat {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+  }
+
+  .result-val { color: var(--text); }
+  .result-val.good { color: var(--accent); }
+  .result-val.bad { color: var(--danger); }
+  .result-val.warn { color: var(--warn); }
+
+  #status {
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 8px;
+    min-height: 18px;
+  }
+
+  #map {
+    flex: 1;
+    height: 100%;
+    background: #0d1117;
+  }
+
+  .leaflet-container {
+    background: #0d1117;
+  }
+
+  .instruction-tip {
+    background: rgba(13,17,23,0.85);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 6px 10px;
+    font-size: 0.65rem;
+    color: var(--muted);
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    pointer-events: none;
+    white-space: nowrap;
+    transition: opacity 0.3s;
+  }
+
+  /* Leaflet dark overrides */
+  .leaflet-control-zoom a {
+    background: var(--panel) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+  }
+
+  .leaflet-control-attribution {
+    background: rgba(13,17,23,0.7) !important;
+    color: var(--muted) !important;
+    font-size: 9px !important;
+  }
+
+  .leaflet-control-attribution a { color: var(--muted) !important; }
+
+  .spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .marker-a, .marker-b {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  }
+  .marker-a { background: #3fb950; }
+  .marker-b { background: #58a6ff; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⬡ SYR BIKE ROUTER</h1>
+  <span class="badge">BNA DATA · JAN 2025</span>
+  <span class="badge" style="background:rgba(88,166,255,0.1);color:var(--accent2);border-color:rgba(88,166,255,0.3);">PEOPLE FOR BIKES</span>
+</header>
+
+<div class="main">
+  <div id="sidebar">
+    <div class="sidebar-scroll">
+
+      <div class="section-label">Set Points</div>
+
+      <div class="input-group">
+        <label>START (A)</label>
+        <div class="addr-wrap">
+          <input class="addr-input" id="inputA" placeholder="Type an address…" autocomplete="off"
+            onfocus="setMode('A')" oninput="onAddrInput('A', this.value)" onkeydown="onAddrKey(event,'A')">
+          <div class="suggestions" id="suggestA"></div>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>END (B)</label>
+        <div class="addr-wrap">
+          <input class="addr-input" id="inputB" placeholder="Type an address…" autocomplete="off"
+            onfocus="setMode('B')" oninput="onAddrInput('B', this.value)" onkeydown="onAddrKey(event,'B')">
+          <div class="suggestions" id="suggestB"></div>
+        </div>
+      </div>
+
+      <button class="btn-route" onclick="runRoute()">FIND LOWEST STRESS ROUTE →</button>
+      <button class="btn-clear" onclick="clearAll()">✕ clear all</button>
+
+      <hr class="divider">
+      <div class="section-label">Hill Avoidance</div>
+      <div class="toggle-row">
+        <span class="toggle-label">Avoid hills &gt;12% grade</span>
+        <button class="toggle" id="hillToggle" onclick="toggleHill()"></button>
+      </div>
+      <div id="elevStatus" style="font-size:0.62rem;color:var(--muted);margin-top:8px;line-height:1.6"></div>
+
+      <hr class="divider">
+      <div class="section-label">Stress Layer</div>
+
+      <div class="toggle-row">
+        <span class="toggle-label">Show stress overlay</span>
+        <button class="toggle on" id="stressToggle" onclick="toggleStress()"></button>
+      </div>
+
+      <div class="stress-legend">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:var(--lts1)"></div>
+          <span>LTS 1 — comfortable (trail, path, calm)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:var(--lts2)"></div>
+          <span>LTS 2 — moderate (bike lane)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:var(--lts3)"></div>
+          <span>LTS 3 — stressful (no protection)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#3d8bff;height:3px"></div>
+          <span>Route (low-stress path)</span>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <div class="section-label">Route Results</div>
+      <div id="results">
+        <span style="color:var(--muted);font-size:0.65rem">Place start & end points, then route.</span>
+      </div>
+
+      <div id="status"></div>
+
+      <hr class="divider">
+      <div class="section-label" style="margin-bottom:6px">How it works</div>
+      <div style="font-size:0.62rem;color:var(--muted);line-height:1.7">
+        Dijkstra's algorithm (Rust/WASM) on the BNA street graph.<br>
+        Edge cost = length × LTS penalty × hill penalty<br>
+        (LTS1=1×, LTS2=2×, LTS3=10×)<br>
+        Hill: &gt;4%=1.5×, &gt;8%=4×, &gt;12%=50×<br><br>
+        Grade data: SRTM30m via OpenTopoData (baked in).<br>
+        Data: PeopleForBikes BNA, Jan 2025.<br>
+        15,164 nodes · 34,497 directed edges.
+      </div>
+
+    </div>
+  </div>
+
+  <div style="position:relative;flex:1">
+    <div id="map"></div>
+    <div class="instruction-tip" id="tip">Click map to place START point</div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+import wasmInit, { init as wasmLoad, nearest_node, route } from './pkg/nav_wasm.js';
+
+document.addEventListener('DOMContentLoaded', async function() {
+// ── Load data + WASM ─────────────────────────────────────────────────
+setStatus('<span class="spinner"></span>Loading map data…');
+setElevStatus('Loading…');
+
+const [jsonText] = await Promise.all([
+  fetch('./syr_map.json').then(r => r.text()),
+  wasmInit(),
+]);
+
+wasmLoad(jsonText);
+const mapData = JSON.parse(jsonText);
+const nodes = mapData.nodes;
+const waysFeatures = mapData.ways;
+
+setElevStatus('✓ Grades loaded · ' + Object.keys(nodes).length + ' nodes');
+clearStatus();
+
+
+// ── Map setup ────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [43.048, -76.147],
+  zoom: 13,
+  zoomControl: true
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CartoDB',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+// ── Stress overlay ───────────────────────────────────────────────────
+const stressColors = { 1: '#3fb950', 2: '#e3b341', 3: '#f85149' };
+const stressOpacity = { 1: 0.7, 2: 0.6, 3: 0.5 };
+const stressWeight = { 1: 3, 2: 2, 3: 1.5 };
+
+let stressLayer = null;
+let stressVisible = true;
+
+function buildStressLayer() {
+  const layers = [];
+  for (const feat of waysFeatures) {
+    const s = feat.properties.stress;
+    const coords = feat.geometry.coordinates.map(c => [c[1], c[0]]);
+    const line = L.polyline(coords, {
+      color: stressColors[s] || '#888',
+      weight: stressWeight[s] || 1.5,
+      opacity: stressOpacity[s] || 0.4,
+      interactive: false
+    });
+    layers.push(line);
+  }
+  return L.layerGroup(layers);
+}
+
+window.toggleStress = function() {
+  stressVisible = !stressVisible;
+  document.getElementById('stressToggle').classList.toggle('on', stressVisible);
+  if (stressVisible) {
+    if (!stressLayer) {
+      setStatus('<span class="spinner"></span>Building stress overlay…');
+      setTimeout(() => {
+        stressLayer = buildStressLayer();
+        stressLayer.addTo(map);
+        clearStatus();
+      }, 50);
+    } else {
+      stressLayer.addTo(map);
+    }
+  } else {
+    if (stressLayer) map.removeLayer(stressLayer);
+  }
+}
+
+// Build on load
+stressLayer = buildStressLayer();
+stressLayer.addTo(map);
+
+// ── State ────────────────────────────────────────────────────────────
+let mode = 'A';
+let ptA = null, ptB = null;
+let markerA = null, markerB = null;
+let routeLayer = null;
+
+// ── Geocoding ────────────────────────────────────────────────────────
+const PHOTON_URL = 'https://photon.komoot.io/api/';
+const NOM_REVERSE = 'https://nominatim.openstreetmap.org/reverse';
+let debounceTimers = { A: null, B: null };
+let suggestionData = { A: [], B: [] };
+let activeSugIdx = { A: -1, B: -1 };
+
+window.onAddrInput = function onAddrInput(which, val) {
+  clearTimeout(debounceTimers[which]);
+  if (val.length < 3) { closeSuggestions(which); return; }
+  debounceTimers[which] = setTimeout(() => fetchSuggestions(which, val), 300);
+}
+
+async function fetchSuggestions(which, query) {
+  const params = new URLSearchParams({
+    q: query, limit: 6, lang: 'en',
+    lat: 43.048, lon: -76.147,  // bias toward Syracuse
+  });
+  try {
+    const resp = await fetch(PHOTON_URL + '?' + params);
+    const data = await resp.json();
+    suggestionData[which] = data.features || [];
+    activeSugIdx[which] = -1;
+    renderSuggestions(which);
+  } catch(e) { /* silently ignore */ }
+}
+
+function renderSuggestions(which) {
+  const box = document.getElementById('suggest' + which);
+  const items = suggestionData[which];
+  if (!items.length) { closeSuggestions(which); return; }
+  box.innerHTML = items.map((f, i) => {
+    const p = f.properties;
+    const name = p.name || p.street || p.city || 'Unknown';
+    const detail = [p.housenumber, p.street, p.city, p.state]
+      .filter(Boolean).join(', ');
+    return `<div class="suggestion-item" data-idx="${i}" onmousedown="selectSuggestion('${which}',${i})">
+      <div class="sug-name">${name}</div>
+      ${detail ? `<div class="sug-detail">${detail}</div>` : ''}
+    </div>`;
+  }).join('');
+  box.classList.add('open');
+}
+
+function closeSuggestions(which) {
+  document.getElementById('suggest' + which).classList.remove('open');
+  activeSugIdx[which] = -1;
+}
+
+window.onAddrKey = function onAddrKey(e, which) {
+  const items = suggestionData[which];
+  const n = items.length;
+  if (!n) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    activeSugIdx[which] = (activeSugIdx[which] + 1) % n;
+    highlightSug(which);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    activeSugIdx[which] = (activeSugIdx[which] - 1 + n) % n;
+    highlightSug(which);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const idx = activeSugIdx[which] >= 0 ? activeSugIdx[which] : 0;
+    selectSuggestion(which, idx);
+  } else if (e.key === 'Escape') {
+    closeSuggestions(which);
+  }
+}
+
+function highlightSug(which) {
+  const box = document.getElementById('suggest' + which);
+  box.querySelectorAll('.suggestion-item').forEach((el, i) => {
+    el.classList.toggle('active', i === activeSugIdx[which]);
+  });
+}
+
+window.selectSuggestion = function selectSuggestion(which, idx) {
+  const feat = suggestionData[which][idx];
+  if (!feat) return;
+  const [lng, lat] = feat.geometry.coordinates;
+  const p = feat.properties;
+  const label = [p.name || p.street, p.housenumber, p.city].filter(Boolean).join(' ').trim()
+    || (lat.toFixed(5) + ', ' + lng.toFixed(5));
+  placePoint(which, lat, lng, label);
+  closeSuggestions(which);
+}
+
+function placePoint(which, lat, lng, label) {
+  if (which === 'A') {
+    ptA = [lat, lng];
+    if (markerA) map.removeLayer(markerA);
+    markerA = L.circleMarker([lat, lng], {
+      radius: 8, fillColor: '#3fb950', color: 'white', weight: 2, fillOpacity: 1
+    }).addTo(map).bindTooltip('START', {permanent: false});
+    const inp = document.getElementById('inputA');
+    inp.value = label;
+    inp.className = 'addr-input set-a';
+    inp.blur();
+    if (!ptB) setMode('B');
+  } else {
+    ptB = [lat, lng];
+    if (markerB) map.removeLayer(markerB);
+    markerB = L.circleMarker([lat, lng], {
+      radius: 8, fillColor: '#58a6ff', color: 'white', weight: 2, fillOpacity: 1
+    }).addTo(map).bindTooltip('END', {permanent: false});
+    const inp = document.getElementById('inputB');
+    inp.value = label;
+    inp.className = 'addr-input set-b';
+    inp.blur();
+  }
+  updateTip();
+  map.panTo([lat, lng], {animate: true});
+}
+
+async function reverseGeocode(lat, lng, which) {
+  try {
+    const params = new URLSearchParams({lat, lon: lng, format: 'json'});
+    const resp = await fetch(NOM_REVERSE + '?' + params, {
+      headers: { 'Accept-Language': 'en' }
+    });
+    const data = await resp.json();
+    const addr = data.address || {};
+    const label = [addr.house_number, addr.road, addr.city || addr.town || addr.village]
+      .filter(Boolean).join(' ').trim() || (lat.toFixed(5) + ', ' + lng.toFixed(5));
+    placePoint(which, lat, lng, label);
+  } catch(e) {
+    placePoint(which, lat, lng, lat.toFixed(5) + ', ' + lng.toFixed(5));
+  }
+}
+
+// Close suggestions when clicking outside
+document.addEventListener('mousedown', e => {
+  ['A','B'].forEach(w => {
+    const wrap = document.getElementById('input' + w)?.closest('.addr-wrap');
+    if (wrap && !wrap.contains(e.target)) closeSuggestions(w);
+  });
+});
+
+// ── Map click ────────────────────────────────────────────────────────
+map.on('click', e => {
+  const {lat, lng} = e.latlng;
+  reverseGeocode(lat, lng, mode);
+  if (mode === 'A' && !ptB) setMode('B');
+});
+
+window.setMode = function(m) {
+  mode = m;
+  updateTip();
+}
+
+function updateTip() {
+  const tip = document.getElementById('tip');
+  if (!ptA) { tip.textContent = 'Type an address or click map for START'; tip.style.opacity='1'; }
+  else if (!ptB) { tip.textContent = 'Now set END point'; tip.style.opacity='1'; }
+  else { tip.style.opacity='0'; }
+}
+
+window.clearAll = function() {
+  ptA = ptB = null;
+  if (markerA) { map.removeLayer(markerA); markerA = null; }
+  if (markerB) { map.removeLayer(markerB); markerB = null; }
+  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  const inpA = document.getElementById('inputA');
+  const inpB = document.getElementById('inputB');
+  inpA.value = ''; inpA.className = 'addr-input';
+  inpB.value = ''; inpB.className = 'addr-input';
+  closeSuggestions('A'); closeSuggestions('B');
+  document.getElementById('results').innerHTML = '<span style="color:var(--muted);font-size:0.65rem">Place start & end points, then route.</span>';
+  clearStatus();
+  setMode('A');
+  updateTip();
+}
+
+// ── Hill avoidance ──────────────────────────────────────────────────
+let hillAvoid = false;
+
+function setElevStatus(msg) {
+  document.getElementById('elevStatus').innerHTML = msg;
+}
+
+window.toggleHill = function() {
+  hillAvoid = !hillAvoid;
+  document.getElementById('hillToggle').classList.toggle('on', hillAvoid);
+};
+
+
+// ── Route ────────────────────────────────────────────────────────────
+window.runRoute = async function() {
+  if (!ptA || !ptB) {
+    setStatus('⚠ Place both start and end points first.');
+    return;
+  }
+
+  setStatus('<span class="spinner"></span>Routing…');
+  await new Promise(r => setTimeout(r, 30));
+
+  const nodeA = nearest_node(ptA[0], ptA[1]);
+  const nodeB = nearest_node(ptB[0], ptB[1]);
+
+  const result = route(nodeA, nodeB, hillAvoid);
+
+  if (!result) {
+    setStatus('✕ No route found between these points.');
+    return;
+  }
+
+  if (routeLayer) map.removeLayer(routeLayer);
+
+  const { path, edgePath } = result;
+
+  // Build route geometry from node coords
+  const routeCoords = path.map(id => {
+    const c = nodes[id];
+    return [c[1], c[0]];
+  });
+
+  // Segment coloring by stress
+  const routeLines = [];
+  for (let i = 0; i < edgePath.length; i++) {
+    const e = edgePath[i];
+    const from = nodes[path[i]];
+    const to = nodes[path[i+1]];
+    const s = e.s;
+    const grade = (e.g ?? 0) * 100;
+    const gradeStr = ' · ' + grade.toFixed(1) + '% grade';
+    routeLines.push(L.polyline([[from[1],from[0]], [to[1],to[0]]], {
+      color: stressColors[s] || '#3d8bff',
+      weight: 5,
+      opacity: 0.95,
+    }).bindTooltip((e.n || 'unnamed') + ' · LTS ' + s + gradeStr, {sticky: true}));
+  }
+
+  // White outline
+  const outline = L.polyline(routeCoords, {color:'white', weight:8, opacity:0.25});
+
+  routeLayer = L.layerGroup([outline, ...routeLines]).addTo(map);
+  map.fitBounds(L.polyline(routeCoords).getBounds(), {padding:[40,40]});
+
+  // Stats
+  let totalLen = 0, lts1 = 0, lts3 = 0;
+  let maxGrade = 0, steepLen = 0;
+  for (let i = 0; i < edgePath.length; i++) {
+    const e = edgePath[i];
+    totalLen += e.l;
+    if (e.s === 1) lts1 += e.l;
+    if (e.s === 3) lts3 += e.l;
+    const grade = (e.g ?? 0) * 100;
+    if (grade > maxGrade) maxGrade = grade;
+    if (grade > 8) steepLen += e.l;
+  }
+  const lts1pct = (lts1/totalLen*100).toFixed(0);
+  const lts3pct = (lts3/totalLen*100).toFixed(0);
+  const distKm = (totalLen/1000).toFixed(2);
+  const distMi = (totalLen/1609.34).toFixed(2);
+  const eta = Math.round(totalLen / (15 * 1000 / 60)); // 15 km/h
+  const steepPct = (steepLen/totalLen*100).toFixed(0);
+
+  document.getElementById('results').innerHTML = `
+    <div class="result-stat"><span>Distance</span><span class="result-val">${distMi} mi (${distKm} km)</span></div>
+    <div class="result-stat"><span>Est. time</span><span class="result-val">${eta} min @ 15km/h</span></div>
+    <div class="result-stat"><span>Low-stress (LTS1)</span><span class="result-val good">${lts1pct}%</span></div>
+    <div class="result-stat"><span>High-stress (LTS3)</span><span class="result-val ${lts3pct>20?'bad':''}">${lts3pct}%</span></div>
+    <div class="result-stat"><span>Max grade</span><span class="result-val ${maxGrade>12?'bad':maxGrade>8?'warn':''}">${maxGrade.toFixed(1)}%</span></div>
+    <div class="result-stat"><span>Steep (&gt;8%) segment</span><span class="result-val ${steepPct>10?'warn':''}">${steepPct}%</span></div>
+    <div class="result-stat"><span>Nodes traversed</span><span class="result-val">${path.length}</span></div>
+  `;
+
+  clearStatus();
+}
+
+function setStatus(msg) {
+  document.getElementById('status').innerHTML = msg;
+}
+function clearStatus() {
+  document.getElementById('status').innerHTML = '';
+}
+
+updateTip();
+});
+
+</script>
+</body>
+</html>
