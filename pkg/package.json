@@ -1,0 +1,14 @@
+{
+  "name": "nav_wasm",
+  "version": "0.1.0",
+  "files": [
+    "nav_wasm_bg.wasm",
+    "nav_wasm.js",
+    "nav_wasm.d.ts"
+  ],
+  "module": "nav_wasm.js",
+  "types": "nav_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
