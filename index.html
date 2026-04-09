@@ -594,7 +594,7 @@
 
       <div class="toggle-row">
         <span class="toggle-label">Show stress overlay</span>
-        <button class="toggle on" id="stressToggle" onclick="toggleStress()"></button>
+        <button class="toggle" id="stressToggle" onclick="toggleStress()"></button>
       </div>
 
       <div class="stress-legend">
@@ -694,7 +694,7 @@ const stressOpacity = { 1: 0.7, 2: 0.6, 3: 0.5 };
 const stressWeight = { 1: 3, 2: 2, 3: 1.5 };
 
 let stressLayer = null;
-let stressVisible = true;
+let stressVisible = false;
 
 function buildStressLayer() {
   const layers = [];
@@ -732,8 +732,7 @@ window.toggleStress = function() {
 }
 
 // Build on load
-stressLayer = buildStressLayer();
-stressLayer.addTo(map);
+// stress overlay off by default
 
 // ── State ────────────────────────────────────────────────────────────
 let mode = 'A';
