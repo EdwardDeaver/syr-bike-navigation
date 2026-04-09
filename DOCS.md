@@ -553,25 +553,41 @@ The key detail is wrapping the file object in a `_LimitedFile` that caps reads t
 Once the WASM module is initialised, a route request follows this sequence:
 
 ```
-User clicks "FIND LOWEST STRESS ROUTE"
+User clicks "Find Lowest Stress Route"
     │
     ▼
 nearest_node(ptA[0], ptA[1])  →  nodeA  (string id)
 nearest_node(ptB[0], ptB[1])  →  nodeB  (string id)
     │
     ▼
-route(nodeA, nodeB, hillAvoid)
+route(nodeA, nodeB, hillFactor)   ← hillFactor 0.0–1.0 from fitness slider
     │   Rust Dijkstra runs in WASM
     ▼
 { path: string[], edgePath: Edge[], distM, lengthM }
     │
-    ├── path  →  Leaflet polyline segments (coloured by stress)
+    ├── path  →  MapLibre GeoJSON LineString (route-outline + route-lines layers)
     ├── edgePath  →  route stats (distance, ETA, LTS%, max grade)
     └── edgePath  →  turn-by-turn directions
                       (bearing deltas at street-name transitions)
 ```
 
-The `edgePath` array is parallel to `path`: `edgePath[i]` is the edge traversed between `path[i]` and `path[i+1]`. The front end uses `edgePath[i].s` (stress) to colour each segment, `edgePath[i].l` (length) for stats, `edgePath[i].g` (grade) for elevation stats, and `edgePath[i].n` (name) for turn detection and tooltips.
+The `edgePath` array is parallel to `path`: `edgePath[i]` is the edge traversed between `path[i]` and `path[i+1]`. The front end uses `edgePath[i].s` (stress) to colour each segment via a MapLibre `match` expression, `edgePath[i].l` (length) for stats, `edgePath[i].g` (grade) for elevation stats, and `edgePath[i].n` (name) for turn detection and hover tooltips.
+
+### PDF export
+
+When the user clicks "Export to PDF", the app snapshots the MapLibre WebGL canvas to a PNG data URL before opening the print dialog:
+
+```js
+map.setLayerZoomRange('road-labels', 0, 24);  // show labels at all zooms
+map.triggerRepaint();
+requestAnimationFrame(() => requestAnimationFrame(() => {
+    const dataUrl = map.getCanvas().toDataURL('image/png');
+    map.setLayerZoomRange('road-labels', 13, 24);  // restore
+    // inject <img> over the map div, then window.print()
+}));
+```
+
+Two `requestAnimationFrame` calls are used: the first schedules the re-render (with labels now visible at all zoom levels), the second fires after the frame has actually painted. The snapshot `<img>` is injected with `z-index: 100` so it sits on top of the (unprintable) WebGL canvas. The `afterprint` event removes it. `preserveDrawingBuffer: true` is set on the map to allow `toDataURL()` to read back the WebGL framebuffer.
 
 ---
 
