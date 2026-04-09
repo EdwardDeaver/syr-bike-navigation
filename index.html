@@ -396,6 +396,152 @@
   }
   .marker-a { background: #3fb950; }
   .marker-b { background: #58a6ff; }
+
+  #dirList { margin-bottom: 10px; list-style: none; }
+  .dir-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.12s;
+  }
+  .dir-step:hover { background: rgba(255,255,255,0.04); }
+  .dir-step:last-child { border-bottom: none; }
+  .dir-icon {
+    font-size: 0.9rem;
+    min-width: 18px;
+    text-align: center;
+    padding-top: 1px;
+    color: var(--accent2);
+    flex-shrink: 0;
+  }
+  .dir-action { font-size: 0.68rem; color: var(--text); line-height: 1.4; }
+  .dir-street-name { color: var(--accent2); }
+  .dir-dist { font-size: 0.62rem; color: var(--muted); margin-top: 2px; }
+
+  /* ── Mobile drawer ───────────────────────────────────────────────── */
+  #sidebar-close { display: none; }
+  #sidebar-fab   { display: none; }
+  #sidebar-backdrop { display: none; }
+
+  @media (max-width: 640px) {
+    header h1 { font-size: 0.9rem; }
+    .badge { display: none; }
+
+    #sidebar {
+      position: fixed;
+      inset: 0;
+      width: 88%;
+      max-width: 300px;
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+      z-index: 2000;
+      border-right: 1px solid var(--border);
+    }
+
+    #sidebar.open { transform: translateX(0); }
+
+    #sidebar-backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0);
+      z-index: 1999;
+      pointer-events: none;
+      transition: background 0.25s ease;
+    }
+
+    #sidebar-backdrop.open {
+      background: rgba(0,0,0,0.55);
+      pointer-events: auto;
+    }
+
+    #sidebar-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 3px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      padding: 0;
+      z-index: 1;
+    }
+
+    #sidebar-close:hover { color: var(--text); border-color: var(--muted); }
+
+    #sidebar-fab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: fixed;
+      bottom: 22px;
+      left: 16px;
+      width: 46px;
+      height: 46px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      color: var(--accent);
+      font-size: 1.2rem;
+      cursor: pointer;
+      z-index: 1500;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+      padding: 0;
+      letter-spacing: 0;
+    }
+  }
+
+  @media print {
+    @page { margin: 0.55in; size: portrait; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    body { height: auto; overflow: visible; }
+
+    .main { flex-direction: column; height: auto; overflow: visible; }
+
+    #sidebar { width: 100%; border: none; overflow: visible; }
+    .sidebar-scroll { overflow: visible; height: auto; padding: 0; }
+
+    /* Hide interactive / decorative elements */
+    .input-group, .btn-row, .btn-route, .btn-clear,
+    .toggle-row, .stress-legend, .badge,
+    #elevStatus, #status, .instruction-tip,
+    .section-label, .divider { display: none !important; }
+
+    /* Show route results + directions */
+    #dirDivider, #dirLabel, #dirList { display: block !important; }
+    #dirDivider { display: block !important; border-top: 1px solid var(--border); margin: 10px 0; }
+
+    #results {
+      margin-bottom: 6px;
+      page-break-inside: avoid;
+    }
+
+    #dirList {
+      page-break-inside: auto;
+    }
+
+    #map {
+      width: 100%;
+      height: 360px;
+      margin-top: 12px;
+      page-break-inside: avoid;
+    }
+
+    .leaflet-control-zoom,
+    .leaflet-control-attribution { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -406,8 +552,11 @@
   <span class="badge" style="background:rgba(88,166,255,0.1);color:var(--accent2);border-color:rgba(88,166,255,0.3);">PEOPLE FOR BIKES</span>
 </header>
 
+<div id="sidebar-backdrop" onclick="closeSidebar()"></div>
+
 <div class="main">
   <div id="sidebar">
+    <button id="sidebar-close" onclick="closeSidebar()" aria-label="Close menu">✕</button>
     <div class="sidebar-scroll">
 
       <div class="section-label">Set Points</div>
@@ -475,6 +624,12 @@
 
       <div id="status"></div>
 
+      <hr class="divider" id="dirDivider" style="display:none">
+      <div class="section-label" id="dirLabel" style="display:none;margin-bottom:6px">Turn-by-Turn</div>
+      <ol id="dirList" style="display:none"></ol>
+
+      <button class="btn-clear" id="btn-export-pdf" onclick="exportPDF()" style="display:none;margin-top:4px">⬇ export to pdf</button>
+
       <hr class="divider">
       <div class="section-label" style="margin-bottom:6px">How it works</div>
       <div style="font-size:0.62rem;color:var(--muted);line-height:1.7">
@@ -495,6 +650,8 @@
     <div class="instruction-tip" id="tip">Click map to place START point</div>
   </div>
 </div>
+
+<button id="sidebar-fab" onclick="toggleSidebar()" aria-label="Open menu">≡</button>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module">
@@ -753,6 +910,10 @@ window.clearAll = function() {
   inpB.value = ''; inpB.className = 'addr-input';
   closeSuggestions('A'); closeSuggestions('B');
   document.getElementById('results').innerHTML = '<span style="color:var(--muted);font-size:0.65rem">Place start & end points, then route.</span>';
+  document.getElementById('dirList').style.display = 'none';
+  document.getElementById('dirDivider').style.display = 'none';
+  document.getElementById('dirLabel').style.display = 'none';
+  document.getElementById('btn-export-pdf').style.display = 'none';
   clearStatus();
   setMode('A');
   updateTip();
@@ -770,6 +931,132 @@ window.toggleHill = function() {
   document.getElementById('hillToggle').classList.toggle('on', hillAvoid);
 };
 
+
+// ── Turn-by-turn directions ──────────────────────────────────────────
+function bearingDeg(a, b) {
+  const lat1 = a[1] * Math.PI / 180, lat2 = b[1] * Math.PI / 180;
+  const dL = (b[0] - a[0]) * Math.PI / 180;
+  const y = Math.sin(dL) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dL);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function turnType(inB, outB) {
+  let d = outB - inB;
+  if (d > 180) d -= 360;
+  if (d < -180) d += 360;
+  if (d < -120 || d > 120) return 'u-turn';
+  if (d < -45) return 'left';
+  if (d < -15) return 'slight-left';
+  if (d >  45) return 'right';
+  if (d >  15) return 'slight-right';
+  return 'straight';
+}
+
+function compassDir(b) {
+  return ['north','northeast','east','southeast','south','southwest','west','northwest'][Math.round(b / 45) % 8];
+}
+
+function fmtDist(m) {
+  const mi = m / 1609.34;
+  return mi < 0.1 ? Math.round(m * 3.281) + ' ft' : mi.toFixed(1) + ' mi';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function buildDirections(path, edgePath, nodes) {
+  if (!edgePath.length) return [];
+
+  // Group consecutive edges with same street name into segments
+  const segs = [];
+  let seg = { name: edgePath[0].n || '', edges: [edgePath[0]], startIdx: 0 };
+  for (let i = 1; i < edgePath.length; i++) {
+    const name = edgePath[i].n || '';
+    if (name === seg.name) {
+      seg.edges.push(edgePath[i]);
+    } else {
+      segs.push(seg);
+      seg = { name, edges: [edgePath[i]], startIdx: i };
+    }
+  }
+  segs.push(seg);
+
+  const steps = [];
+  for (let s = 0; s < segs.length; s++) {
+    const { name, edges, startIdx } = segs[s];
+    const dist = edges.reduce((sum, e) => sum + e.l, 0);
+    const ni = startIdx;
+    const street = escHtml(name || 'unnamed road');
+
+    let action, icon;
+    if (s === 0) {
+      const bear = bearingDeg(nodes[path[0]], nodes[path[1]]);
+      action = `Head ${compassDir(bear)} on <span class="dir-street-name">${street}</span>`;
+      icon = '▶';
+    } else {
+      const inB  = bearingDeg(nodes[path[ni - 1]], nodes[path[ni]]);
+      const outB = bearingDeg(nodes[path[ni]],     nodes[path[ni + 1]]);
+      const turn = turnType(inB, outB);
+      const labels = { left:'Turn left', 'slight-left':'Bear left', right:'Turn right', 'slight-right':'Bear right', straight:'Continue', 'u-turn':'Make a U-turn' };
+      const icons  = { left:'←', 'slight-left':'↖', right:'→', 'slight-right':'↗', straight:'↑', 'u-turn':'↩' };
+      action = `${labels[turn]} onto <span class="dir-street-name">${street}</span>`;
+      icon = icons[turn];
+    }
+
+    steps.push({ action, icon, dist, lat: nodes[path[ni]][1], lng: nodes[path[ni]][0] });
+  }
+
+  const last = nodes[path[path.length - 1]];
+  steps.push({ action: 'Arrive at destination', icon: '⬡', dist: 0, lat: last[1], lng: last[0] });
+  return steps;
+}
+
+function renderDirections(steps) {
+  const list = document.getElementById('dirList');
+  list.innerHTML = steps.map(step => {
+    const distHtml = step.dist > 0 ? `<div class="dir-dist">${fmtDist(step.dist)}</div>` : '';
+    return `<li class="dir-step" onclick="panToStep(${step.lat},${step.lng})">
+      <span class="dir-icon">${step.icon}</span>
+      <div>
+        <div class="dir-action">${step.action}</div>
+        ${distHtml}
+      </div>
+    </li>`;
+  }).join('');
+  list.style.display = 'block';
+  document.getElementById('dirDivider').style.display = '';
+  document.getElementById('dirLabel').style.display = '';
+  document.getElementById('btn-export-pdf').style.display = '';
+}
+
+window.panToStep = function(lat, lng) {
+  map.panTo([lat, lng], { animate: true, duration: 0.5 });
+};
+
+window.toggleSidebar = function() {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const opening = !sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', opening);
+  backdrop.classList.toggle('open', opening);
+  if (!opening) map.invalidateSize();
+};
+
+window.closeSidebar = function() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop').classList.remove('open');
+  map.invalidateSize();
+};
+
+window.exportPDF = function() {
+  window.print();
+};
+
+window.addEventListener('beforeprint', () => {
+  map.invalidateSize();
+});
 
 // ── Route ────────────────────────────────────────────────────────────
 window.runRoute = async function() {
@@ -839,12 +1126,12 @@ window.runRoute = async function() {
   const lts3pct = (lts3/totalLen*100).toFixed(0);
   const distKm = (totalLen/1000).toFixed(2);
   const distMi = (totalLen/1609.34).toFixed(2);
-  const eta = Math.round(totalLen / (15 * 1000 / 60)); // 15 km/h
+  const eta = Math.round(totalLen / (10 * 1609.34 / 60)); // 10 mph
   const steepPct = (steepLen/totalLen*100).toFixed(0);
 
   document.getElementById('results').innerHTML = `
     <div class="result-stat"><span>Distance</span><span class="result-val">${distMi} mi (${distKm} km)</span></div>
-    <div class="result-stat"><span>Est. time</span><span class="result-val">${eta} min @ 15km/h</span></div>
+    <div class="result-stat"><span>Est. time</span><span class="result-val">${eta} min @ 10mph</span></div>
     <div class="result-stat"><span>Low-stress (LTS1)</span><span class="result-val good">${lts1pct}%</span></div>
     <div class="result-stat"><span>High-stress (LTS3)</span><span class="result-val ${lts3pct>20?'bad':''}">${lts3pct}%</span></div>
     <div class="result-stat"><span>Max grade</span><span class="result-val ${maxGrade>12?'bad':maxGrade>8?'warn':''}">${maxGrade.toFixed(1)}%</span></div>
@@ -852,7 +1139,9 @@ window.runRoute = async function() {
     <div class="result-stat"><span>Nodes traversed</span><span class="result-val">${path.length}</span></div>
   `;
 
+  renderDirections(buildDirections(path, edgePath, nodes));
   clearStatus();
+  if (window.innerWidth <= 640) closeSidebar();
 }
 
 function setStatus(msg) {
