@@ -471,13 +471,14 @@
                   color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
     #dirList    { display: block !important; page-break-inside: auto; }
 
-    /* Map snapshot */
+    /* Map snapshot — height driven by the inline snapshot image */
     #map {
       width: 100% !important;
-      height: 380px !important;
+      height: auto !important;
       margin-top: 12px !important;
       page-break-inside: avoid !important;
       position: relative !important;
+      overflow: hidden !important;
     }
 
     .maplibregl-ctrl-zoom-in, .maplibregl-ctrl-zoom-out,
@@ -604,10 +605,8 @@
 
 <button id="sidebar-fab" onclick="toggleSidebar()" aria-label="Open menu">≡</button>
 
-<!-- Patch fetch BEFORE pmtiles.js loads so the library picks up the override.
-     GitHub Pages (Fastly) sets Content-Encoding: gzip on binary files;
-     the browser silently decompresses, corrupting PMTiles byte offsets.
-     Accept-Encoding: identity tells the CDN to send raw bytes. -->
+<!-- PMTiles fetch patch (disabled — GitHub Pages CDN gzip issue)
+     Re-enable alongside pmtiles.js when self-hosted tiles are working.
 <script>
 (function() {
   const _orig = window.fetch.bind(window);
@@ -623,15 +622,15 @@
 })();
 </script>
 <script src="./lib/pmtiles.js"></script>
+-->
 <script src="./lib/maplibre-gl.js"></script>
 <script type="module">
 import wasmInit, { init as wasmLoad, nearest_node, route } from './pkg/nav_wasm.js';
 
-// ── PMTiles protocol ──────────────────────────────────────────────────
+/* ── PMTiles + vector style (disabled — swap back in when CDN issue resolved) ──
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
 
-// ── Map style — Google Maps-esque light theme ─────────────────────────
 const lightStyle = {
   version: 8,
   glyphs: './lib/glyphs/{fontstack}/{range}.pbf',
@@ -643,98 +642,46 @@ const lightStyle = {
     }
   },
   layers: [
-    // Background — warm tan like Google Maps
-    { id: 'bg', type: 'background',
-      paint: { 'background-color': '#e8e0d8' } },
+    { id: 'bg', type: 'background', paint: { 'background-color': '#e8e0d8' } },
+    { id: 'water', type: 'fill', source: 'openmaptiles', 'source-layer': 'water', paint: { 'fill-color': '#aad3df' } },
+    { id: 'waterway', type: 'line', source: 'openmaptiles', 'source-layer': 'waterway', paint: { 'line-color': '#aad3df', 'line-width': ['interpolate',['linear'],['zoom'],10,1,14,3] } },
+    { id: 'landcover-wood', type: 'fill', source: 'openmaptiles', 'source-layer': 'landcover', filter: ['in', ['get', 'class'], ['literal', ['wood', 'forest']]], paint: { 'fill-color': '#b6cfa4' } },
+    { id: 'landcover-grass', type: 'fill', source: 'openmaptiles', 'source-layer': 'landcover', filter: ['in', ['get', 'class'], ['literal', ['grass', 'meadow', 'farmland']]], paint: { 'fill-color': '#c9d9ae' } },
+    { id: 'landuse-park', type: 'fill', source: 'openmaptiles', 'source-layer': 'landuse', filter: ['in', ['get', 'class'], ['literal', ['park', 'pitch', 'recreation_ground', 'cemetery']]], paint: { 'fill-color': '#c5dba4' } },
+    { id: 'building', type: 'fill', source: 'openmaptiles', 'source-layer': 'building', paint: { 'fill-color': '#dbd5cb', 'fill-outline-color': '#cbc5bb' } },
+    { id: 'road-path', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', filter: ['in', ['get', 'class'], ['literal', ['path', 'footway', 'cycleway']]], layout: { 'line-cap': 'round' }, paint: { 'line-color': '#c4bdb4', 'line-width': 1, 'line-dasharray': [2,2] } },
+    { id: 'road-minor-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', filter: ['in', ['get', 'class'], ['literal', ['minor', 'service', 'track']]], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#d4cdc4', 'line-width': ['interpolate',['linear'],['zoom'],10,2.5,14,6] } },
+    { id: 'road-secondary-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', filter: ['in', ['get', 'class'], ['literal', ['secondary', 'tertiary']]], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#c8c0b8', 'line-width': ['interpolate',['linear'],['zoom'],10,3.5,14,9] } },
+    { id: 'road-primary-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', filter: ['in', ['get', 'class'], ['literal', ['primary', 'trunk']]], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#c89040', 'line-width': ['interpolate',['linear'],['zoom'],10,4,14,12] } },
+    { id: 'road-motorway-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', filter: ['==', ['get', 'class'], 'motorway'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#c07820', 'line-width': ['interpolate',['linear'],['zoom'],10,5,14,14] } },
+    { id: 'road-minor-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', filter: ['in', ['get', 'class'], ['literal', ['minor', 'service', 'track']]], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate',['linear'],['zoom'],10,1.5,14,4.5] } },
+    { id: 'road-secondary-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', filter: ['in', ['get', 'class'], ['literal', ['secondary', 'tertiary']]], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate',['linear'],['zoom'],10,2,14,7] } },
+    { id: 'road-primary-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', filter: ['in', ['get', 'class'], ['literal', ['primary', 'trunk']]], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fce28a', 'line-width': ['interpolate',['linear'],['zoom'],10,2.5,14,9] } },
+    { id: 'road-motorway-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', filter: ['==', ['get', 'class'], 'motorway'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#f8b94c', 'line-width': ['interpolate',['linear'],['zoom'],10,3.5,14,11] } },
+    { id: 'road-labels', type: 'symbol', source: 'openmaptiles', 'source-layer': 'transportation_name', minzoom: 13,
+      layout: { 'text-field': ['get', 'name'], 'text-font': ['Open Sans Regular'], 'text-size': ['interpolate',['linear'],['zoom'],13,10,16,13], 'symbol-placement': 'line', 'text-max-angle': 30, 'text-padding': 10 },
+      paint: { 'text-color': '#5c5446', 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.5 } },
+  ]
+};
+── end PMTiles block ── */
 
-    // Water
-    { id: 'water', type: 'fill', source: 'openmaptiles', 'source-layer': 'water',
-      paint: { 'fill-color': '#aad3df' } },
-    { id: 'waterway', type: 'line', source: 'openmaptiles', 'source-layer': 'waterway',
-      paint: { 'line-color': '#aad3df', 'line-width': ['interpolate',['linear'],['zoom'],10,1,14,3] } },
-
-    // Green areas
-    { id: 'landcover-wood', type: 'fill', source: 'openmaptiles', 'source-layer': 'landcover',
-      filter: ['in', ['get', 'class'], ['literal', ['wood', 'forest']]],
-      paint: { 'fill-color': '#b6cfa4' } },
-    { id: 'landcover-grass', type: 'fill', source: 'openmaptiles', 'source-layer': 'landcover',
-      filter: ['in', ['get', 'class'], ['literal', ['grass', 'meadow', 'farmland']]],
-      paint: { 'fill-color': '#c9d9ae' } },
-    { id: 'landuse-park', type: 'fill', source: 'openmaptiles', 'source-layer': 'landuse',
-      filter: ['in', ['get', 'class'], ['literal', ['park', 'pitch', 'recreation_ground', 'cemetery']]],
-      paint: { 'fill-color': '#c5dba4' } },
-
-    // Buildings
-    { id: 'building', type: 'fill', source: 'openmaptiles', 'source-layer': 'building',
-      paint: { 'fill-color': '#dbd5cb', 'fill-outline-color': '#cbc5bb' } },
-
-    // Paths/cycleways
-    { id: 'road-path', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
-      filter: ['in', ['get', 'class'], ['literal', ['path', 'footway', 'cycleway']]],
-      layout: { 'line-cap': 'round' },
-      paint: { 'line-color': '#c4bdb4', 'line-width': 1, 'line-dasharray': [2,2] } },
-
-    // Road casings (drawn wide, behind road fills)
-    { id: 'road-minor-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
-      filter: ['in', ['get', 'class'], ['literal', ['minor', 'service', 'track']]],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#d4cdc4',
-        'line-width': ['interpolate',['linear'],['zoom'],10,2.5,14,6] } },
-    { id: 'road-secondary-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
-      filter: ['in', ['get', 'class'], ['literal', ['secondary', 'tertiary']]],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#c8c0b8',
-        'line-width': ['interpolate',['linear'],['zoom'],10,3.5,14,9] } },
-    { id: 'road-primary-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
-      filter: ['in', ['get', 'class'], ['literal', ['primary', 'trunk']]],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#c89040',
-        'line-width': ['interpolate',['linear'],['zoom'],10,4,14,12] } },
-    { id: 'road-motorway-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
-      filter: ['==', ['get', 'class'], 'motorway'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#c07820',
-        'line-width': ['interpolate',['linear'],['zoom'],10,5,14,14] } },
-
-    // Road fills (drawn on top, narrower — white for minor/secondary, yellow for major)
-    { id: 'road-minor-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
-      filter: ['in', ['get', 'class'], ['literal', ['minor', 'service', 'track']]],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#ffffff',
-        'line-width': ['interpolate',['linear'],['zoom'],10,1.5,14,4.5] } },
-    { id: 'road-secondary-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
-      filter: ['in', ['get', 'class'], ['literal', ['secondary', 'tertiary']]],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#ffffff',
-        'line-width': ['interpolate',['linear'],['zoom'],10,2,14,7] } },
-    { id: 'road-primary-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
-      filter: ['in', ['get', 'class'], ['literal', ['primary', 'trunk']]],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#fce28a',
-        'line-width': ['interpolate',['linear'],['zoom'],10,2.5,14,9] } },
-    { id: 'road-motorway-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
-      filter: ['==', ['get', 'class'], 'motorway'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#f8b94c',
-        'line-width': ['interpolate',['linear'],['zoom'],10,3.5,14,11] } },
-
-    // Road labels
-    { id: 'road-labels', type: 'symbol', source: 'openmaptiles', 'source-layer': 'transportation_name',
-      minzoom: 13,
-      layout: {
-        'text-field': ['get', 'name'],
-        'text-font': ['Open Sans Regular'],
-        'text-size': ['interpolate',['linear'],['zoom'],13,10,16,13],
-        'symbol-placement': 'line',
-        'text-max-angle': 30,
-        'text-padding': 10,
-      },
-      paint: {
-        'text-color': '#5c5446',
-        'text-halo-color': 'rgba(255,255,255,0.85)',
-        'text-halo-width': 1.5,
-      }
-    },
+// ── Hosted raster tiles (CartoDB Light) ───────────────────────────────
+const lightStyle = {
+  version: 8,
+  sources: {
+    carto: {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+        'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+        'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+      ],
+      tileSize: 256,
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>'
+    }
+  },
+  layers: [
+    { id: 'carto-tiles', type: 'raster', source: 'carto' }
   ]
 };
 
@@ -850,6 +797,7 @@ let mode = 'A';
 let ptA = null, ptB = null;
 let markerA = null, markerB = null;
 let hasRoute = false;
+let routeBounds = null; // [[minLng,minLat],[maxLng,maxLat]] — stored for PDF fit
 
 // ── Geocoding ─────────────────────────────────────────────────────────
 const PHOTON_URL = 'https://photon.komoot.io/api/';
@@ -1170,19 +1118,39 @@ window.closeSidebar = function() {
 let printMapImg = null;
 
 window.exportPDF = function() {
-  // Show labels at all zoom levels for the snapshot, then restore
-  map.setLayerZoomRange('road-labels', 0, 24);
-  map.triggerRepaint();
-  // Two rAF calls: first schedules the render, second fires after it completes
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  const mapEl = document.getElementById('map');
+
+  // Fit route into the CURRENT canvas (no resize — avoids requesting tiles for a
+  // different viewport size, which is the root cause of gray/cut-off strips).
+  if (routeBounds) {
+    map.fitBounds(routeBounds, { padding: 60, animate: false });
+  }
+
+  const doSnapshot = () => {
+    // When using local vector tiles, widen label zoom range before snapshot:
+    // map.setLayerZoomRange('road-labels', 0, 24);
     const dataUrl = map.getCanvas().toDataURL('image/png');
-    map.setLayerZoomRange('road-labels', 13, 24);
+    // map.setLayerZoomRange('road-labels', 13, 24);
+
     printMapImg = document.createElement('img');
     printMapImg.src = dataUrl;
-    printMapImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:100;display:block;';
-    document.getElementById('map').appendChild(printMapImg);
+    // Render at full page width, natural height — no object-fit distortion/cropping.
+    // The print CSS lets #map height be driven by the image.
+    printMapImg.style.cssText = 'display:block;width:100%;height:auto;position:relative;z-index:100;';
+    mapEl.appendChild(printMapImg);
     setTimeout(() => window.print(), 150);
-  }));
+  };
+
+  // Wait for the first rendered frame after the camera move — this guarantees
+  // the canvas is painted at the new position AND tile requests are in-flight.
+  // Then wait for idle if tiles are still loading.
+  map.once('render', () => {
+    if (map.areTilesLoaded()) {
+      doSnapshot();
+    } else {
+      map.once('idle', doSnapshot);
+    }
+  });
 };
 
 window.addEventListener('afterprint', () => {
@@ -1235,7 +1203,8 @@ window.runRoute = async function() {
     if (lng > maxLng) maxLng = lng;
     if (lat > maxLat) maxLat = lat;
   }
-  map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 40 });
+  routeBounds = [[minLng, minLat], [maxLng, maxLat]];
+  map.fitBounds(routeBounds, { padding: 40 });
 
   // Stats
   let totalLen = 0, lts1 = 0, lts3 = 0, maxGrade = 0, steepLen = 0;
