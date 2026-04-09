@@ -604,25 +604,28 @@
 
 <button id="sidebar-fab" onclick="toggleSidebar()" aria-label="Open menu">≡</button>
 
+<!-- Patch fetch BEFORE pmtiles.js loads so the library picks up the override.
+     GitHub Pages (Fastly) sets Content-Encoding: gzip on binary files;
+     the browser silently decompresses, corrupting PMTiles byte offsets.
+     Accept-Encoding: identity tells the CDN to send raw bytes. -->
+<script>
+(function() {
+  const _orig = window.fetch.bind(window);
+  window.fetch = function(input, init) {
+    const url = typeof input === 'string' ? input
+      : (input instanceof Request ? input.url : '');
+    if (url.includes('.pmtiles')) {
+      init = { ...(init || {}),
+        headers: { ...((init || {}).headers || {}), 'Accept-Encoding': 'identity' } };
+    }
+    return _orig(input, init);
+  };
+})();
+</script>
 <script src="./lib/pmtiles.js"></script>
 <script src="./lib/maplibre-gl.js"></script>
 <script type="module">
 import wasmInit, { init as wasmLoad, nearest_node, route } from './pkg/nav_wasm.js';
-
-// ── Prevent CDN gzip encoding on PMTiles range requests ───────────────
-// GitHub Pages (Fastly) sets Content-Encoding: gzip which the browser
-// auto-decompresses, corrupting the byte offsets PMTiles depends on.
-// Sending Accept-Encoding: identity disables that transform.
-const _origFetch = window.fetch.bind(window);
-window.fetch = function(input, init) {
-  const url = typeof input === 'string' ? input
-    : (input instanceof Request ? input.url : '');
-  if (url.includes('.pmtiles')) {
-    init = { ...(init || {}),
-      headers: { ...((init || {}).headers || {}), 'Accept-Encoding': 'identity' } };
-  }
-  return _origFetch(input, init);
-};
 
 // ── PMTiles protocol ──────────────────────────────────────────────────
 const protocol = new pmtiles.Protocol();
