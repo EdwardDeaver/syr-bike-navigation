@@ -10,14 +10,19 @@
 3. [Navigation Engine (Rust/WASM)](#navigation-engine-rustwasm)
    - [Graph representation](#graph-representation)
    - [Dijkstra's algorithm](#dijkstras-algorithm)
-   - [Hill penalty](#hill-penalty)
+   - [Hill penalty and fitness slider](#hill-penalty-and-fitness-slider)
    - [Nearest-node lookup](#nearest-node-lookup)
 4. [WASM Build and Loading](#wasm-build-and-loading)
    - [Compiling with wasm-pack](#compiling-with-wasm-pack)
    - [Generated JS glue layer](#generated-js-glue-layer)
    - [Loading in the browser](#loading-in-the-browser)
-5. [Front-End Routing Flow](#front-end-routing-flow)
-6. [Data Schema Reference](#data-schema-reference)
+5. [Map Rendering](#map-rendering)
+   - [PMTiles and local tiles](#pmtiles-and-local-tiles)
+   - [MapLibre GL JS style](#maplibre-gl-js-style)
+   - [Local glyph files](#local-glyph-files)
+   - [Local development server](#local-development-server)
+6. [Front-End Routing Flow](#front-end-routing-flow)
+7. [Data Schema Reference](#data-schema-reference)
 
 ---
 
@@ -211,7 +216,7 @@ struct Edge {
 
 ### Dijkstra's algorithm
 
-`route(from_id, to_id, avoid_hills)` runs a standard single-source shortest-path search using a binary min-heap.
+`route(from_id, to_id, hill_factor)` runs a standard single-source shortest-path search using a binary min-heap.
 
 #### Min-heap ordering
 
@@ -243,7 +248,8 @@ while let Some(HeapItem { cost: d, idx: u }) = heap.pop() {
     if d > dist[u as usize] { continue; } // stale heap entry — skip
 
     for (ei, edge) in g.adj[u].iter().enumerate() {
-        let penalty = if avoid_hills { hill_penalty(edge.grade) } else { 1.0 };
+        // hill_factor 0.0 = no penalty, 1.0 = full penalty
+        let penalty = 1.0 + (hill_penalty(edge.grade) - 1.0) * hill_factor;
         let nd = d + edge.cost * penalty;
         let v = edge.to_idx as usize;
         if nd < dist[v] {
@@ -282,7 +288,9 @@ The reversed `edge_seq` then maps directly to the `edgePath` returned to JavaScr
 
 ---
 
-### Hill penalty
+### Hill penalty and fitness slider
+
+The base hill penalty function maps grade to a multiplier:
 
 ```rust
 fn hill_penalty(grade: f64) -> f64 {
@@ -294,14 +302,34 @@ fn hill_penalty(grade: f64) -> f64 {
 }
 ```
 
-| Grade (abs) | Multiplier | Effect |
-|-------------|------------|--------|
-| ≤ 4%        | 1.0×       | No penalty — comfortable cycling |
-| 4–8%        | 1.5×       | Mild penalty — noticeable climb |
-| 8–12%       | 4.0×       | Heavy penalty — steep, most cyclists dismount |
-| > 12%       | 50.0×      | Near-prohibitive — equivalent to 50× the distance |
+| Grade (abs) | Base multiplier | Effect |
+|-------------|-----------------|--------|
+| ≤ 4%        | 1.0×            | No penalty — comfortable cycling |
+| 4–8%        | 1.5×            | Mild penalty — noticeable climb |
+| 8–12%       | 4.0×            | Heavy penalty — steep, most cyclists dismount |
+| > 12%       | 50.0×           | Near-prohibitive — equivalent to 50× the distance |
 
-The penalty is applied to `edge.cost` (the already-LTS-weighted cost), so a >12% hill on an LTS-3 street is penalised 50× on top of the LTS-3 penalty. This almost always routes around such segments even at significant detour cost. The multiplier is only applied when `avoid_hills = true`; otherwise all penalties are 1.0.
+Rather than a simple on/off toggle, the `hill_factor` parameter (0.0–1.0) interpolates between no avoidance and full avoidance:
+
+```rust
+let penalty = 1.0 + (hill_penalty(edge.grade) - 1.0) * hill_factor.clamp(0.0, 1.0);
+```
+
+- `hill_factor = 0.0` → all penalties collapse to 1.0 (hills have no effect on routing)
+- `hill_factor = 1.0` → full `hill_penalty()` values apply
+- `hill_factor = 0.5` → penalties are halfway between 1.0 and the base multiplier
+
+In the UI, this is exposed as a 5-step fitness slider:
+
+| Slider position | Label | `hill_factor` |
+|-----------------|-------|---------------|
+| 0 (leftmost)    | Casual | 1.0 |
+| 1               | Easy | 0.75 |
+| 2 (default)     | Moderate | 0.5 |
+| 3               | Fit | 0.25 |
+| 4 (rightmost)   | Athletic | 0.0 |
+
+The mapping is `hill_factor = (4 - slider_value) / 4`, so moving right toward "Athletic" reduces avoidance.
 
 ---
 
@@ -424,30 +452,99 @@ export function nearest_node(lat, lng) {
 
 ### Loading in the browser
 
-**File:** `index.html` (lines 500–513)
-
-The WASM module is loaded via the ES module import and the default export (the init function) provided by `wasm-pack`:
+The WASM module, graph JSON, and MapLibre map are all initialised in parallel:
 
 ```js
 import wasmInit, { init as wasmLoad, nearest_node, route }
     from './pkg/nav_wasm.js';
 
-// In DOMContentLoaded:
+const mapLoaded = new Promise(resolve => map.once('load', resolve));
+
 const [jsonText] = await Promise.all([
     fetch('./syr_map.json').then(r => r.text()),
-    wasmInit(),   // fetches and instantiates nav_wasm_bg.wasm
+    wasmInit(),     // fetches and instantiates nav_wasm_bg.wasm
+    mapLoaded,      // MapLibre finishes loading style + initial tiles
 ]);
 
 wasmLoad(jsonText);  // parses JSON, builds graph in WASM memory
+// safe to add GeoJSON sources/layers now
 ```
 
-The two operations are parallelised with `Promise.all`:
-- `fetch('./syr_map.json')` downloads the ~1–2 MB graph JSON
-- `wasmInit()` fetches the ~138 KB `.wasm` binary, compiles it to native code in the browser's WASM JIT, and returns
+Three things happen simultaneously:
+- `fetch('./syr_map.json')` downloads the ~2 MB graph JSON
+- `wasmInit()` fetches the ~138 KB `.wasm` binary and compiles it
+- `mapLoaded` waits for MapLibre to load the PMTiles style and fire its `load` event
 
-Both downloads and compilations happen simultaneously. `wasmLoad(jsonText)` (which maps to the Rust `init(json)` function) is only called after both complete, ensuring the WASM module is instantiated before the graph JSON is handed to it.
+GeoJSON sources and layers are only added to the map after all three complete, ensuring the map is ready to receive them. `wasmLoad(jsonText)` is called immediately after, parsing the graph into WASM memory.
 
-`wasmInit()` internally calls `WebAssembly.instantiateStreaming` (or `WebAssembly.instantiate` as fallback), which compiles the `.wasm` binary on a background thread in modern browsers, keeping the main thread unblocked.
+`wasmInit()` internally calls `WebAssembly.instantiateStreaming`, which compiles the `.wasm` binary on a background thread in modern browsers, keeping the main thread unblocked.
+
+---
+
+## Map Rendering
+
+### PMTiles and local tiles
+
+The map is rendered entirely from a local vector tile archive (`tiling/syracuse.pmtiles`) with no CDN dependency. The file was produced from an [OpenMapTiles](https://openmaptiles.org/) MBTiles export using the `pmtiles convert` CLI:
+
+```bash
+pmtiles convert osm-2020-02-10-v3.11_new-york_syracuse.mbtiles syracuse.pmtiles
+```
+
+PMTiles is a single-file archive format for map tiles. Instead of a server endpoint per tile, the browser fetches byte ranges from one file using HTTP `Range` requests — the same mechanism used for video seeking. The `pmtiles` JS library handles range request dispatch and tile decompression transparently.
+
+The PMTiles protocol is registered before the map is created:
+
+```js
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
+```
+
+After this, any MapLibre source URL beginning with `pmtiles://` is intercepted by the protocol handler, which issues `Range` requests to the local file and returns decompressed tile buffers to MapLibre's renderer.
+
+> **Local development note:** Python's built-in `http.server` does not support `Range` requests. Use `serve.py` (included in the repo) instead.
+
+### MapLibre GL JS style
+
+The map uses an inline style object (no external style URL) with layers targeting the OpenMapTiles vector schema. The style includes:
+
+- **Background** — warm tan (`#e8e0d8`), matching Google Maps' base colour
+- **Water** — `aad3df` blue fill + waterway lines
+- **Green areas** — `landcover` (wood, grass) and `landuse` (parks) layers in muted green
+- **Buildings** — light tan fill with subtle outline
+- **Roads** — rendered in pairs: a wider *casing* layer (slightly darker, drawn first) and a narrower *fill* layer on top. This creates the classic road-on-background effect without needing a separate road-background polygon layer:
+  - Minor roads: tan casing + white fill
+  - Secondary/tertiary: slightly darker casing + white fill
+  - Primary/trunk: golden casing + pale yellow fill
+  - Motorways: orange casing + amber fill
+- **Road labels** — `transportation_name` symbol layer, `Open Sans Regular` font, line-following placement (`symbol-placement: line`), min zoom 13
+
+All road width values use `interpolate` expressions to scale smoothly with zoom level.
+
+### Local glyph files
+
+Map labels require glyph PBF files — pre-rendered font bitmaps for each unicode range. These are served locally from `lib/glyphs/Open Sans Regular/` (256 files covering the full unicode range, ~2 MB total). The style references them as:
+
+```js
+glyphs: './lib/glyphs/{fontstack}/{range}.pbf'
+```
+
+MapLibre fetches only the ranges it actually needs for the characters present in visible labels.
+
+### Local development server
+
+PMTiles requires HTTP `Range` requests. `serve.py` is a minimal Python HTTP server that handles range headers correctly:
+
+```python
+class RangeHandler(SimpleHTTPRequestHandler):
+    def send_head(self):
+        ...
+        if range_header:
+            # parse bytes=start-end, seek to start, return LimitedFile(f, length)
+            ...
+```
+
+The key detail is wrapping the file object in a `_LimitedFile` that caps reads to exactly `Content-Length` bytes — Python's default `copyfile` would otherwise stream the full remainder of the file past the range end, causing the PMTiles library to reject the response.
 
 ---
 
@@ -456,25 +553,41 @@ Both downloads and compilations happen simultaneously. `wasmLoad(jsonText)` (whi
 Once the WASM module is initialised, a route request follows this sequence:
 
 ```
-User clicks "FIND LOWEST STRESS ROUTE"
+User clicks "Find Lowest Stress Route"
     │
     ▼
 nearest_node(ptA[0], ptA[1])  →  nodeA  (string id)
 nearest_node(ptB[0], ptB[1])  →  nodeB  (string id)
     │
     ▼
-route(nodeA, nodeB, hillAvoid)
+route(nodeA, nodeB, hillFactor)   ← hillFactor 0.0–1.0 from fitness slider
     │   Rust Dijkstra runs in WASM
     ▼
 { path: string[], edgePath: Edge[], distM, lengthM }
     │
-    ├── path  →  Leaflet polyline segments (coloured by stress)
+    ├── path  →  MapLibre GeoJSON LineString (route-outline + route-lines layers)
     ├── edgePath  →  route stats (distance, ETA, LTS%, max grade)
     └── edgePath  →  turn-by-turn directions
                       (bearing deltas at street-name transitions)
 ```
 
-The `edgePath` array is parallel to `path`: `edgePath[i]` is the edge traversed between `path[i]` and `path[i+1]`. The front end uses `edgePath[i].s` (stress) to colour each segment, `edgePath[i].l` (length) for stats, `edgePath[i].g` (grade) for elevation stats, and `edgePath[i].n` (name) for turn detection and tooltips.
+The `edgePath` array is parallel to `path`: `edgePath[i]` is the edge traversed between `path[i]` and `path[i+1]`. The front end uses `edgePath[i].s` (stress) to colour each segment via a MapLibre `match` expression, `edgePath[i].l` (length) for stats, `edgePath[i].g` (grade) for elevation stats, and `edgePath[i].n` (name) for turn detection and hover tooltips.
+
+### PDF export
+
+When the user clicks "Export to PDF", the app snapshots the MapLibre WebGL canvas to a PNG data URL before opening the print dialog:
+
+```js
+map.setLayerZoomRange('road-labels', 0, 24);  // show labels at all zooms
+map.triggerRepaint();
+requestAnimationFrame(() => requestAnimationFrame(() => {
+    const dataUrl = map.getCanvas().toDataURL('image/png');
+    map.setLayerZoomRange('road-labels', 13, 24);  // restore
+    // inject <img> over the map div, then window.print()
+}));
+```
+
+Two `requestAnimationFrame` calls are used: the first schedules the re-render (with labels now visible at all zoom levels), the second fires after the frame has actually painted. The snapshot `<img>` is injected with `z-index: 100` so it sits on top of the (unprintable) WebGL canvas. The `afterprint` event removes it. `preserveDrawingBuffer: true` is set on the map to allow `toDataURL()` to read back the WebGL framebuffer.
 
 ---
 

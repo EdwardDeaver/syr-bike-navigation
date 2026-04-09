@@ -4,74 +4,83 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Syracuse Low-Stress Bike Router</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./lib/maplibre-gl.css"/>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #0d1117;
-    --panel: #161b22;
-    --border: #30363d;
-    --text: #e6edf3;
-    --muted: #7d8590;
-    --accent: #3fb950;
-    --accent2: #58a6ff;
-    --warn: #f0883e;
-    --danger: #f85149;
-    --lts1: #3fb950;
-    --lts2: #e3b341;
-    --lts3: #f85149;
+    --bg: #f1f3f4;
+    --panel: #ffffff;
+    --border: #e0e0e0;
+    --text: #202124;
+    --muted: #5f6368;
+    --accent: #1a73e8;
+    --accent2: #1e8e3e;
+    --warn: #f9ab00;
+    --danger: #d93025;
+    --lts1: #1e8e3e;
+    --lts2: #f9ab00;
+    --lts3: #d93025;
   }
 
   body {
-    font-family: 'DM Mono', monospace;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
     height: 100vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    font-size: 14px;
   }
 
+  /* ── Header ─────────────────────────────────────────────────────── */
   header {
-    padding: 10px 18px;
+    height: 60px;
+    padding: 0 20px;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
     flex-shrink: 0;
     z-index: 1000;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+
+  .header-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-size: 16px;
+    flex-shrink: 0;
   }
 
   header h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.05rem;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    color: var(--accent);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.2px;
   }
+
+  header h1 span { color: var(--accent); }
 
   .badge {
-    font-size: 0.65rem;
-    padding: 2px 7px;
-    border-radius: 2px;
-    background: rgba(63,185,80,0.15);
-    color: var(--accent);
-    border: 1px solid rgba(63,185,80,0.3);
-    letter-spacing: 0.08em;
+    font-size: 11px;
+    padding: 2px 9px;
+    border-radius: 12px;
+    background: #e8f0fe;
+    color: #1967d2;
+    font-weight: 500;
   }
 
-  .main {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
+  /* ── Layout ─────────────────────────────────────────────────────── */
+  .main { display: flex; flex: 1; overflow: hidden; }
 
   #sidebar {
-    width: 280px;
+    width: 300px;
     flex-shrink: 0;
     background: var(--panel);
     border-right: 1px solid var(--border);
@@ -89,202 +98,162 @@
 
   .sidebar-scroll::-webkit-scrollbar { width: 4px; }
   .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-  .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .sidebar-scroll::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 2px; }
 
+  /* ── Section labels ─────────────────────────────────────────────── */
   .section-label {
-    font-size: 0.6rem;
-    letter-spacing: 0.12em;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
     color: var(--muted);
     margin-bottom: 8px;
     text-transform: uppercase;
   }
 
-  .input-group {
-    margin-bottom: 12px;
-  }
+  /* ── Address inputs ─────────────────────────────────────────────── */
+  .input-group { margin-bottom: 10px; }
 
   .input-group label {
     display: block;
-    font-size: 0.7rem;
+    font-size: 12px;
+    font-weight: 500;
     color: var(--muted);
     margin-bottom: 4px;
   }
 
-  .addr-wrap {
-    position: relative;
-  }
+  .addr-wrap { position: relative; }
 
   .addr-input {
     width: 100%;
-    background: var(--bg);
+    background: #f8f9fa;
     border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 7px 10px;
-    font-size: 0.72rem;
-    font-family: 'DM Mono', monospace;
+    border-radius: 24px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-family: inherit;
     color: var(--text);
-    min-height: 32px;
-    transition: border-color 0.2s;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
     outline: none;
   }
 
-  .addr-input::placeholder { color: var(--muted); }
+  .addr-input::placeholder { color: #9aa0a6; }
 
-  .addr-input.set-a {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  .addr-input.set-b {
-    border-color: var(--accent2);
-    color: var(--accent2);
-  }
+  .addr-input.set-a { border-color: var(--accent2); color: var(--accent2); background: #e6f4ea; }
+  .addr-input.set-b { border-color: var(--accent);  color: var(--accent);  background: #e8f0fe; }
 
   .addr-input:focus {
-    border-color: var(--muted);
+    border-color: var(--accent);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(26,115,232,0.12);
     color: var(--text);
   }
 
+  /* ── Suggestions ─────────────────────────────────────────────────── */
   .suggestions {
     display: none;
     position: absolute;
-    top: calc(100% + 2px);
+    top: calc(100% + 4px);
     left: 0; right: 0;
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: 12px;
     z-index: 2000;
     max-height: 200px;
     overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
   }
 
   .suggestions.open { display: block; }
 
   .suggestion-item {
-    padding: 7px 10px;
-    font-size: 0.68rem;
+    padding: 9px 14px;
+    font-size: 13px;
     cursor: pointer;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #f1f3f4;
     line-height: 1.4;
   }
 
   .suggestion-item:last-child { border-bottom: none; }
+  .suggestion-item:hover, .suggestion-item.active { background: #f8f9fa; }
 
-  .suggestion-item:hover, .suggestion-item.active {
-    background: rgba(255,255,255,0.05);
-  }
+  .suggestion-item .sug-name { color: var(--text); font-weight: 500; }
+  .suggestion-item .sug-detail { color: var(--muted); font-size: 12px; margin-top: 1px; }
 
-  .suggestion-item .sug-name { color: var(--text); }
-  .suggestion-item .sug-detail { color: var(--muted); font-size: 0.62rem; }
-
-  .btn-row {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 14px;
-  }
+  /* ── Buttons ────────────────────────────────────────────────────── */
+  .btn-row { display: flex; gap: 6px; margin-bottom: 12px; }
 
   button {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem;
-    padding: 7px 12px;
-    border-radius: 3px;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 14px;
+    border-radius: 6px;
     border: 1px solid var(--border);
     cursor: pointer;
     transition: all 0.15s;
-    letter-spacing: 0.04em;
+    font-weight: 500;
+    background: var(--panel);
+    color: var(--text);
   }
 
-  .btn-mode {
-    background: transparent;
-    color: var(--muted);
-    flex: 1;
-  }
-
-  .btn-mode.active-a {
-    background: rgba(63,185,80,0.15);
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  .btn-mode.active-b {
-    background: rgba(88,166,255,0.15);
-    border-color: var(--accent2);
-    color: var(--accent2);
-  }
+  .btn-mode { color: var(--muted); flex: 1; }
+  .btn-mode:hover { background: #f8f9fa; }
+  .btn-mode.active-a { background: #e6f4ea; border-color: var(--accent2); color: var(--accent2); }
+  .btn-mode.active-b { background: #e8f0fe; border-color: var(--accent);  color: var(--accent); }
 
   .btn-route {
     width: 100%;
     background: var(--accent);
-    color: var(--bg);
+    color: #fff;
     border-color: var(--accent);
-    font-weight: 500;
-    padding: 9px;
-    margin-bottom: 10px;
-    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 10px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    border-radius: 24px;
+    letter-spacing: 0.1px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 1px 3px rgba(26,115,232,0.3);
   }
 
-  .btn-route:hover { opacity: 0.85; }
+  .btn-route:hover {
+    background: #1765cc;
+    border-color: #1765cc;
+    box-shadow: 0 2px 6px rgba(26,115,232,0.4);
+  }
 
   .btn-clear {
     width: 100%;
     background: transparent;
     color: var(--muted);
-    margin-bottom: 16px;
-    padding: 6px;
-    font-size: 0.68rem;
+    border-color: transparent;
+    margin-bottom: 12px;
+    font-size: 12px;
   }
 
-  .btn-clear:hover { color: var(--danger); border-color: var(--danger); }
+  .btn-clear:hover { color: var(--danger); border-color: #fad2cf; background: #fce8e6; }
 
-  .divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 14px 0;
-  }
+  /* ── Dividers & misc ─────────────────────────────────────────────── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
 
-  .stress-legend {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-bottom: 14px;
-  }
+  .stress-legend { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; }
 
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.68rem;
-    color: var(--muted);
-  }
+  .legend-item { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
 
-  .legend-swatch {
-    width: 28px;
-    height: 4px;
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
+  .legend-swatch { width: 28px; height: 4px; border-radius: 2px; flex-shrink: 0; }
 
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-  }
+  /* ── Toggle ─────────────────────────────────────────────────────── */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 
-  .toggle-label {
-    font-size: 0.68rem;
-    color: var(--muted);
-  }
+  .toggle-label { font-size: 13px; color: var(--text); }
 
   .toggle {
-    width: 34px;
-    height: 18px;
-    background: var(--border);
-    border-radius: 9px;
+    width: 36px; height: 20px;
+    background: #bdc1c6;
+    border-radius: 10px;
     position: relative;
     cursor: pointer;
     transition: background 0.2s;
     border: none;
+    flex-shrink: 0;
   }
 
   .toggle.on { background: var(--accent); }
@@ -292,94 +261,104 @@
   .toggle::after {
     content: '';
     position: absolute;
-    width: 12px;
-    height: 12px;
+    width: 14px; height: 14px;
     background: white;
     border-radius: 50%;
-    top: 3px;
-    left: 3px;
+    top: 3px; left: 3px;
     transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   }
 
   .toggle.on::after { transform: translateX(16px); }
 
+  /* ── Results card ────────────────────────────────────────────────── */
   #results {
-    background: var(--bg);
+    background: #f8f9fa;
     border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 10px;
-    font-size: 0.68rem;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px;
     color: var(--muted);
     min-height: 60px;
-    margin-bottom: 10px;
-    line-height: 1.6;
+    margin-bottom: 8px;
+    line-height: 1.8;
   }
 
-  .result-stat {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 3px;
-  }
+  .result-stat { display: flex; justify-content: space-between; }
+  .result-val { color: var(--text); font-weight: 600; }
+  .result-val.good   { color: var(--accent2); }
+  .result-val.bad    { color: var(--danger); }
+  .result-val.warn   { color: var(--warn); }
 
-  .result-val { color: var(--text); }
-  .result-val.good { color: var(--accent); }
-  .result-val.bad { color: var(--danger); }
-  .result-val.warn { color: var(--warn); }
+  #status { font-size: 12px; color: var(--muted); margin-top: 6px; min-height: 18px; }
 
-  #status {
-    font-size: 0.65rem;
-    color: var(--muted);
-    margin-top: 8px;
-    min-height: 18px;
-  }
+  /* ── Map ─────────────────────────────────────────────────────────── */
+  #map { flex: 1; height: 100%; background: #e8e4df; position: relative; }
 
-  #map {
-    flex: 1;
-    height: 100%;
-    background: #0d1117;
-  }
-
-  .leaflet-container {
-    background: #0d1117;
-  }
-
+  /* ── Tip ─────────────────────────────────────────────────────────── */
   .instruction-tip {
-    background: rgba(13,17,23,0.85);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 6px 10px;
-    font-size: 0.65rem;
+    background: white;
+    border: none;
+    border-radius: 20px;
+    padding: 7px 16px;
+    font-size: 13px;
     color: var(--muted);
     position: absolute;
-    bottom: 28px;
+    bottom: 40px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
     pointer-events: none;
     white-space: nowrap;
     transition: opacity 0.3s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08);
   }
 
-  /* Leaflet dark overrides */
-  .leaflet-control-zoom a {
-    background: var(--panel) !important;
-    color: var(--text) !important;
-    border-color: var(--border) !important;
+  /* ── MapLibre overrides ──────────────────────────────────────────── */
+  .maplibregl-ctrl-group {
+    border-radius: 8px !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
+    border: none !important;
+    overflow: hidden;
+  }
+  .maplibregl-ctrl-zoom-in,
+  .maplibregl-ctrl-zoom-out,
+  .maplibregl-ctrl-compass { background-color: #fff !important; }
+  .maplibregl-ctrl-attrib {
+    background: rgba(255,255,255,0.8) !important;
+    color: #9aa0a6 !important;
+    font-size: 10px !important;
+    border-radius: 4px !important;
+  }
+  .maplibregl-ctrl-attrib a { color: #9aa0a6 !important; }
+
+  /* ── Route popup ────────────────────────────────────────────────── */
+  .route-popup .maplibregl-popup-content {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .route-popup .maplibregl-popup-tip { border-top-color: white; }
+
+  /* ── Markers ────────────────────────────────────────────────────── */
+  .map-marker {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 2.5px solid white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    cursor: pointer;
   }
 
-  .leaflet-control-attribution {
-    background: rgba(13,17,23,0.7) !important;
-    color: var(--muted) !important;
-    font-size: 9px !important;
-  }
-
-  .leaflet-control-attribution a { color: var(--muted) !important; }
-
+  /* ── Spinner ────────────────────────────────────────────────────── */
   .spinner {
     display: inline-block;
-    width: 10px;
-    height: 10px;
-    border: 2px solid var(--border);
+    width: 11px; height: 11px;
+    border: 2px solid #dadce0;
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
@@ -388,39 +367,21 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .marker-a, .marker-b {
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    border: 2px solid white;
-    box-shadow: 0 0 6px rgba(0,0,0,0.5);
-  }
-  .marker-a { background: #3fb950; }
-  .marker-b { background: #58a6ff; }
-
-  #dirList { margin-bottom: 10px; list-style: none; }
+  /* ── Directions ─────────────────────────────────────────────────── */
+  #dirList { margin-bottom: 8px; list-style: none; }
   .dir-step {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 6px 4px;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    border-radius: 2px;
-    transition: background 0.12s;
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 6px;
+    border-bottom: 1px solid #f1f3f4;
+    cursor: pointer; border-radius: 6px;
+    transition: background 0.1s;
   }
-  .dir-step:hover { background: rgba(255,255,255,0.04); }
+  .dir-step:hover { background: #f8f9fa; }
   .dir-step:last-child { border-bottom: none; }
-  .dir-icon {
-    font-size: 0.9rem;
-    min-width: 18px;
-    text-align: center;
-    padding-top: 1px;
-    color: var(--accent2);
-    flex-shrink: 0;
-  }
-  .dir-action { font-size: 0.68rem; color: var(--text); line-height: 1.4; }
-  .dir-street-name { color: var(--accent2); }
-  .dir-dist { font-size: 0.62rem; color: var(--muted); margin-top: 2px; }
+  .dir-icon { font-size: 15px; min-width: 20px; text-align: center; color: var(--accent); flex-shrink: 0; padding-top: 1px; }
+  .dir-action { font-size: 13px; color: var(--text); line-height: 1.4; }
+  .dir-street-name { color: var(--accent); font-weight: 600; }
+  .dir-dist { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
   /* ── Mobile drawer ───────────────────────────────────────────────── */
   #sidebar-close { display: none; }
@@ -428,77 +389,47 @@
   #sidebar-backdrop { display: none; }
 
   @media (max-width: 640px) {
-    header h1 { font-size: 0.9rem; }
+    header h1 { font-size: 14px; }
     .badge { display: none; }
 
     #sidebar {
-      position: fixed;
-      inset: 0;
-      width: 88%;
-      max-width: 300px;
+      position: fixed; inset: 0;
+      width: 88%; max-width: 320px;
       transform: translateX(-100%);
       transition: transform 0.25s ease;
       z-index: 2000;
-      border-right: 1px solid var(--border);
+      box-shadow: 4px 0 20px rgba(0,0,0,0.15);
     }
-
     #sidebar.open { transform: translateX(0); }
 
     #sidebar-backdrop {
       display: block;
-      position: fixed;
-      inset: 0;
+      position: fixed; inset: 0;
       background: rgba(0,0,0,0);
-      z-index: 1999;
-      pointer-events: none;
+      z-index: 1999; pointer-events: none;
       transition: background 0.25s ease;
     }
-
-    #sidebar-backdrop.open {
-      background: rgba(0,0,0,0.55);
-      pointer-events: auto;
-    }
+    #sidebar-backdrop.open { background: rgba(0,0,0,0.35); pointer-events: auto; }
 
     #sidebar-close {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 28px;
-      height: 28px;
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      border-radius: 3px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      padding: 0;
-      z-index: 1;
+      display: flex; align-items: center; justify-content: center;
+      position: absolute; top: 14px; right: 14px;
+      width: 30px; height: 30px;
+      background: #f1f3f4; border: none;
+      color: var(--muted); border-radius: 50%;
+      font-size: 13px; cursor: pointer; padding: 0; z-index: 1;
     }
-
-    #sidebar-close:hover { color: var(--text); border-color: var(--muted); }
+    #sidebar-close:hover { background: #dadce0; }
 
     #sidebar-fab {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: fixed;
-      bottom: 22px;
-      left: 16px;
-      width: 46px;
-      height: 46px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 50%;
-      color: var(--accent);
-      font-size: 1.2rem;
-      cursor: pointer;
-      z-index: 1500;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-      padding: 0;
-      letter-spacing: 0;
+      display: flex; align-items: center; justify-content: center;
+      position: fixed; bottom: 24px; left: 16px;
+      width: 48px; height: 48px;
+      background: white; border: none;
+      border-radius: 50%; color: var(--accent);
+      font-size: 20px; cursor: pointer; z-index: 1500;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      padding: 0; letter-spacing: 0;
     }
   }
 
@@ -506,50 +437,61 @@
     @page { margin: 0.55in; size: portrait; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
-    body { height: auto; overflow: visible; }
+    body { height: auto; overflow: visible; font-size: 14px; }
 
-    .main { flex-direction: column; height: auto; overflow: visible; }
+    header { display: flex !important; box-shadow: none; border-bottom: 1px solid var(--border); }
+    .badge { display: inline !important; }
 
-    #sidebar { width: 100%; border: none; overflow: visible; }
-    .sidebar-scroll { overflow: visible; height: auto; padding: 0; }
+    .main { flex-direction: column !important; height: auto !important; overflow: visible !important; }
 
-    /* Hide interactive / decorative elements */
+    /* Reset mobile sidebar positioning unconditionally */
+    #sidebar {
+      position: static !important;
+      transform: none !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      border: none !important;
+      overflow: visible !important;
+      box-shadow: none !important;
+      flex-shrink: 0 !important;
+    }
+    .sidebar-scroll { overflow: visible !important; height: auto !important; padding: 0 !important; }
+
+    /* Hide interactive / chrome elements */
     .input-group, .btn-row, .btn-route, .btn-clear,
-    .toggle-row, .stress-legend, .badge,
+    .toggle-row, .stress-legend,
     #elevStatus, #status, .instruction-tip,
-    .section-label, .divider { display: none !important; }
+    .section-label, .divider,
+    #sidebar-close, #sidebar-fab, #sidebar-backdrop { display: none !important; }
 
-    /* Show route results + directions */
-    #dirDivider, #dirLabel, #dirList { display: block !important; }
-    #dirDivider { display: block !important; border-top: 1px solid var(--border); margin: 10px 0; }
+    /* Show results + directions */
+    #results    { display: block !important; margin-bottom: 8px; page-break-inside: avoid; }
+    #dirDivider { display: block !important; border-top: 1px solid var(--border); margin: 8px 0; }
+    #dirLabel   { display: block !important; font-size: 11px; font-weight: 600; letter-spacing: 0.6px;
+                  color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
+    #dirList    { display: block !important; page-break-inside: auto; }
 
-    #results {
-      margin-bottom: 6px;
-      page-break-inside: avoid;
-    }
-
-    #dirList {
-      page-break-inside: auto;
-    }
-
+    /* Map snapshot */
     #map {
-      width: 100%;
-      height: 360px;
-      margin-top: 12px;
-      page-break-inside: avoid;
+      width: 100% !important;
+      height: 380px !important;
+      margin-top: 12px !important;
+      page-break-inside: avoid !important;
+      position: relative !important;
     }
 
-    .leaflet-control-zoom,
-    .leaflet-control-attribution { display: none !important; }
+    .maplibregl-ctrl-zoom-in, .maplibregl-ctrl-zoom-out,
+    .maplibregl-ctrl-compass, .maplibregl-ctrl-attrib,
+    .maplibregl-canvas { display: none !important; }
   }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>⬡ SYR BIKE ROUTER</h1>
-  <span class="badge">BNA DATA · JAN 2025</span>
-  <span class="badge" style="background:rgba(88,166,255,0.1);color:var(--accent2);border-color:rgba(88,166,255,0.3);">PEOPLE FOR BIKES</span>
+  <div class="header-icon">🚲</div>
+  <h1>Syr <span>Bike</span> Router</h1>
+  <span class="badge">BNA · Jan 2025</span>
 </header>
 
 <div id="sidebar-backdrop" onclick="closeSidebar()"></div>
@@ -583,11 +525,20 @@
 
       <hr class="divider">
       <div class="section-label">Hill Avoidance</div>
-      <div class="toggle-row">
-        <span class="toggle-label">Avoid hills &gt;12% grade</span>
-        <button class="toggle" id="hillToggle" onclick="toggleHill()"></button>
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:12px;color:var(--muted)">Fitness level</span>
+          <span style="font-size:12px;font-weight:600;color:var(--accent)" id="hillLabel">Moderate</span>
+        </div>
+        <input type="range" id="hillSlider" min="0" max="4" step="1" value="2"
+          oninput="onHillSlider(this.value)"
+          style="width:100%;accent-color:var(--accent);cursor:pointer">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#9aa0a6;margin-top:4px">
+          <span>Casual</span>
+          <span>Athletic</span>
+        </div>
       </div>
-      <div id="elevStatus" style="font-size:0.62rem;color:var(--muted);margin-top:8px;line-height:1.6"></div>
+      <div id="elevStatus" style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.6"></div>
 
       <hr class="divider">
       <div class="section-label">Stress Layer</div>
@@ -632,13 +583,13 @@
 
       <hr class="divider">
       <div class="section-label" style="margin-bottom:6px">How it works</div>
-      <div style="font-size:0.62rem;color:var(--muted);line-height:1.7">
+      <div style="font-size:12px;color:var(--muted);line-height:1.7">
         Dijkstra's algorithm (Rust/WASM) on the BNA street graph.<br>
         Edge cost = length × LTS penalty × hill penalty<br>
         (LTS1=1×, LTS2=2×, LTS3=10×)<br>
         Hill: &gt;4%=1.5×, &gt;8%=4×, &gt;12%=50×<br><br>
         Grade data: SRTM30m via OpenTopoData (baked in).<br>
-        Data: PeopleForBikes BNA, Jan 2025.<br>
+        Data: <a href="https://cityratings.peopleforbikes.org/cities/syracuse-ny" target="_blank">PeopleForBikes BNA, Jan 2025</a>.<br>
         15,164 nodes · 34,497 directed edges.
       </div>
 
@@ -653,18 +604,143 @@
 
 <button id="sidebar-fab" onclick="toggleSidebar()" aria-label="Open menu">≡</button>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./lib/pmtiles.js"></script>
+<script src="./lib/maplibre-gl.js"></script>
 <script type="module">
 import wasmInit, { init as wasmLoad, nearest_node, route } from './pkg/nav_wasm.js';
 
+// ── PMTiles protocol ──────────────────────────────────────────────────
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
+
+// ── Map style — Google Maps-esque light theme ─────────────────────────
+const lightStyle = {
+  version: 8,
+  glyphs: './lib/glyphs/{fontstack}/{range}.pbf',
+  sources: {
+    openmaptiles: {
+      type: 'vector',
+      url: 'pmtiles://./tiling/syracuse.pmtiles',
+      attribution: '© <a href="https://www.maptiler.com/copyright/">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+    }
+  },
+  layers: [
+    // Background — warm tan like Google Maps
+    { id: 'bg', type: 'background',
+      paint: { 'background-color': '#e8e0d8' } },
+
+    // Water
+    { id: 'water', type: 'fill', source: 'openmaptiles', 'source-layer': 'water',
+      paint: { 'fill-color': '#aad3df' } },
+    { id: 'waterway', type: 'line', source: 'openmaptiles', 'source-layer': 'waterway',
+      paint: { 'line-color': '#aad3df', 'line-width': ['interpolate',['linear'],['zoom'],10,1,14,3] } },
+
+    // Green areas
+    { id: 'landcover-wood', type: 'fill', source: 'openmaptiles', 'source-layer': 'landcover',
+      filter: ['in', ['get', 'class'], ['literal', ['wood', 'forest']]],
+      paint: { 'fill-color': '#b6cfa4' } },
+    { id: 'landcover-grass', type: 'fill', source: 'openmaptiles', 'source-layer': 'landcover',
+      filter: ['in', ['get', 'class'], ['literal', ['grass', 'meadow', 'farmland']]],
+      paint: { 'fill-color': '#c9d9ae' } },
+    { id: 'landuse-park', type: 'fill', source: 'openmaptiles', 'source-layer': 'landuse',
+      filter: ['in', ['get', 'class'], ['literal', ['park', 'pitch', 'recreation_ground', 'cemetery']]],
+      paint: { 'fill-color': '#c5dba4' } },
+
+    // Buildings
+    { id: 'building', type: 'fill', source: 'openmaptiles', 'source-layer': 'building',
+      paint: { 'fill-color': '#dbd5cb', 'fill-outline-color': '#cbc5bb' } },
+
+    // Paths/cycleways
+    { id: 'road-path', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+      filter: ['in', ['get', 'class'], ['literal', ['path', 'footway', 'cycleway']]],
+      layout: { 'line-cap': 'round' },
+      paint: { 'line-color': '#c4bdb4', 'line-width': 1, 'line-dasharray': [2,2] } },
+
+    // Road casings (drawn wide, behind road fills)
+    { id: 'road-minor-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+      filter: ['in', ['get', 'class'], ['literal', ['minor', 'service', 'track']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#d4cdc4',
+        'line-width': ['interpolate',['linear'],['zoom'],10,2.5,14,6] } },
+    { id: 'road-secondary-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+      filter: ['in', ['get', 'class'], ['literal', ['secondary', 'tertiary']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#c8c0b8',
+        'line-width': ['interpolate',['linear'],['zoom'],10,3.5,14,9] } },
+    { id: 'road-primary-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+      filter: ['in', ['get', 'class'], ['literal', ['primary', 'trunk']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#c89040',
+        'line-width': ['interpolate',['linear'],['zoom'],10,4,14,12] } },
+    { id: 'road-motorway-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+      filter: ['==', ['get', 'class'], 'motorway'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#c07820',
+        'line-width': ['interpolate',['linear'],['zoom'],10,5,14,14] } },
+
+    // Road fills (drawn on top, narrower — white for minor/secondary, yellow for major)
+    { id: 'road-minor-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+      filter: ['in', ['get', 'class'], ['literal', ['minor', 'service', 'track']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#ffffff',
+        'line-width': ['interpolate',['linear'],['zoom'],10,1.5,14,4.5] } },
+    { id: 'road-secondary-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+      filter: ['in', ['get', 'class'], ['literal', ['secondary', 'tertiary']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#ffffff',
+        'line-width': ['interpolate',['linear'],['zoom'],10,2,14,7] } },
+    { id: 'road-primary-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+      filter: ['in', ['get', 'class'], ['literal', ['primary', 'trunk']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#fce28a',
+        'line-width': ['interpolate',['linear'],['zoom'],10,2.5,14,9] } },
+    { id: 'road-motorway-fill', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation',
+      filter: ['==', ['get', 'class'], 'motorway'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#f8b94c',
+        'line-width': ['interpolate',['linear'],['zoom'],10,3.5,14,11] } },
+
+    // Road labels
+    { id: 'road-labels', type: 'symbol', source: 'openmaptiles', 'source-layer': 'transportation_name',
+      minzoom: 13,
+      layout: {
+        'text-field': ['get', 'name'],
+        'text-font': ['Open Sans Regular'],
+        'text-size': ['interpolate',['linear'],['zoom'],13,10,16,13],
+        'symbol-placement': 'line',
+        'text-max-angle': 30,
+        'text-padding': 10,
+      },
+      paint: {
+        'text-color': '#5c5446',
+        'text-halo-color': 'rgba(255,255,255,0.85)',
+        'text-halo-width': 1.5,
+      }
+    },
+  ]
+};
+
 document.addEventListener('DOMContentLoaded', async function() {
-// ── Load data + WASM ─────────────────────────────────────────────────
+
+// ── Init map ──────────────────────────────────────────────────────────
+const map = new maplibregl.Map({
+  container: 'map',
+  style: lightStyle,
+  center: [-76.147, 43.048],
+  zoom: 13,
+  preserveDrawingBuffer: true,
+});
+
+// ── Load data + WASM in parallel with map tile initialisation ─────────
 setStatus('<span class="spinner"></span>Loading map data…');
 setElevStatus('Loading…');
+
+const mapLoaded = new Promise(resolve => map.once('load', resolve));
 
 const [jsonText] = await Promise.all([
   fetch('./syr_map.json').then(r => r.text()),
   wasmInit(),
+  mapLoaded,
 ]);
 
 wasmLoad(jsonText);
@@ -675,72 +751,89 @@ const waysFeatures = mapData.ways;
 setElevStatus('✓ Grades loaded · ' + Object.keys(nodes).length + ' nodes');
 clearStatus();
 
+// ── GeoJSON sources ───────────────────────────────────────────────────
+const emptyFC = { type: 'FeatureCollection', features: [] };
+map.addSource('stress',        { type: 'geojson', data: emptyFC });
+map.addSource('route-outline', { type: 'geojson', data: emptyFC });
+map.addSource('route',         { type: 'geojson', data: emptyFC });
 
-// ── Map setup ────────────────────────────────────────────────────────
-const map = L.map('map', {
-  center: [43.048, -76.147],
-  zoom: 13,
-  zoomControl: true
+// ── Stress overlay layer ──────────────────────────────────────────────
+map.addLayer({
+  id: 'stress-lines', type: 'line', source: 'stress',
+  layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
+  paint: {
+    'line-color':   ['match', ['get', 'stress'], 1, '#3fb950', 2, '#e3b341', '#f85149'],
+    'line-width':   ['match', ['get', 'stress'], 1, 3, 2, 2, 1.5],
+    'line-opacity': ['match', ['get', 'stress'], 1, 0.7, 2, 0.6, 0.5]
+  }
 });
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap &copy; CartoDB',
-  subdomains: 'abcd', maxZoom: 19
-}).addTo(map);
+// ── Route layers ──────────────────────────────────────────────────────
+map.addLayer({
+  id: 'route-outline', type: 'line', source: 'route-outline',
+  layout: { 'line-cap': 'round', 'line-join': 'round' },
+  paint: { 'line-color': 'rgba(0,0,0,0.15)', 'line-width': 10, 'line-blur': 2 }
+});
 
-// ── Stress overlay ───────────────────────────────────────────────────
-const stressColors = { 1: '#3fb950', 2: '#e3b341', 3: '#f85149' };
-const stressOpacity = { 1: 0.7, 2: 0.6, 3: 0.5 };
-const stressWeight = { 1: 3, 2: 2, 3: 1.5 };
-
-let stressLayer = null;
-let stressVisible = false;
-
-function buildStressLayer() {
-  const layers = [];
-  for (const feat of waysFeatures) {
-    const s = feat.properties.stress;
-    const coords = feat.geometry.coordinates.map(c => [c[1], c[0]]);
-    const line = L.polyline(coords, {
-      color: stressColors[s] || '#888',
-      weight: stressWeight[s] || 1.5,
-      opacity: stressOpacity[s] || 0.4,
-      interactive: false
-    });
-    layers.push(line);
+map.addLayer({
+  id: 'route-lines', type: 'line', source: 'route',
+  layout: { 'line-cap': 'round', 'line-join': 'round' },
+  paint: {
+    'line-color':   ['match', ['get', 's'], 1, '#3fb950', 2, '#e3b341', 3, '#f85149', '#3d8bff'],
+    'line-width':   5,
+    'line-opacity': 0.95
   }
-  return L.layerGroup(layers);
-}
+});
+
+// ── Route hover popup ─────────────────────────────────────────────────
+const hoverPopup = new maplibregl.Popup({
+  closeButton: false, closeOnClick: false, className: 'route-popup'
+});
+map.on('mousemove', 'route-lines', e => {
+  map.getCanvas().style.cursor = 'pointer';
+  const p = e.features[0].properties;
+  const grade = ((p.g ?? 0) * 100).toFixed(1);
+  hoverPopup.setLngLat(e.lngLat)
+    .setHTML(`${escHtml(p.n || 'unnamed')} · LTS ${p.s} · ${grade}% grade`)
+    .addTo(map);
+});
+map.on('mouseleave', 'route-lines', () => {
+  map.getCanvas().style.cursor = '';
+  hoverPopup.remove();
+});
+
+// ── Stress toggle ─────────────────────────────────────────────────────
+let stressVisible = false;
+let stressLoaded = false;
 
 window.toggleStress = function() {
   stressVisible = !stressVisible;
   document.getElementById('stressToggle').classList.toggle('on', stressVisible);
-  if (stressVisible) {
-    if (!stressLayer) {
-      setStatus('<span class="spinner"></span>Building stress overlay…');
-      setTimeout(() => {
-        stressLayer = buildStressLayer();
-        stressLayer.addTo(map);
-        clearStatus();
-      }, 50);
-    } else {
-      stressLayer.addTo(map);
-    }
-  } else {
-    if (stressLayer) map.removeLayer(stressLayer);
+  if (stressVisible && !stressLoaded) {
+    setStatus('<span class="spinner"></span>Building stress overlay…');
+    setTimeout(() => {
+      map.getSource('stress').setData({
+        type: 'FeatureCollection',
+        features: waysFeatures.map(f => ({
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: f.geometry.coordinates },
+          properties: f.properties
+        }))
+      });
+      stressLoaded = true;
+      clearStatus();
+    }, 50);
   }
-}
+  map.setLayoutProperty('stress-lines', 'visibility', stressVisible ? 'visible' : 'none');
+};
 
-// Build on load
-// stress overlay off by default
-
-// ── State ────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────
 let mode = 'A';
 let ptA = null, ptB = null;
 let markerA = null, markerB = null;
-let routeLayer = null;
+let hasRoute = false;
 
-// ── Geocoding ────────────────────────────────────────────────────────
+// ── Geocoding ─────────────────────────────────────────────────────────
 const PHOTON_URL = 'https://photon.komoot.io/api/';
 const NOM_REVERSE = 'https://nominatim.openstreetmap.org/reverse';
 let debounceTimers = { A: null, B: null };
@@ -756,7 +849,7 @@ window.onAddrInput = function onAddrInput(which, val) {
 async function fetchSuggestions(which, query) {
   const params = new URLSearchParams({
     q: query, limit: 6, lang: 'en',
-    lat: 43.048, lon: -76.147,  // bias toward Syracuse
+    lat: 43.048, lon: -76.147,
   });
   try {
     const resp = await fetch(PHOTON_URL + '?' + params);
@@ -828,13 +921,19 @@ window.selectSuggestion = function selectSuggestion(which, idx) {
   closeSuggestions(which);
 }
 
+function makeMarkerEl(color) {
+  const el = document.createElement('div');
+  el.className = 'map-marker';
+  el.style.background = color;
+  return el;
+}
+
 function placePoint(which, lat, lng, label) {
   if (which === 'A') {
     ptA = [lat, lng];
-    if (markerA) map.removeLayer(markerA);
-    markerA = L.circleMarker([lat, lng], {
-      radius: 8, fillColor: '#3fb950', color: 'white', weight: 2, fillOpacity: 1
-    }).addTo(map).bindTooltip('START', {permanent: false});
+    if (markerA) markerA.remove();
+    markerA = new maplibregl.Marker({ element: makeMarkerEl('#3fb950') })
+      .setLngLat([lng, lat]).addTo(map);
     const inp = document.getElementById('inputA');
     inp.value = label;
     inp.className = 'addr-input set-a';
@@ -842,17 +941,16 @@ function placePoint(which, lat, lng, label) {
     if (!ptB) setMode('B');
   } else {
     ptB = [lat, lng];
-    if (markerB) map.removeLayer(markerB);
-    markerB = L.circleMarker([lat, lng], {
-      radius: 8, fillColor: '#58a6ff', color: 'white', weight: 2, fillOpacity: 1
-    }).addTo(map).bindTooltip('END', {permanent: false});
+    if (markerB) markerB.remove();
+    markerB = new maplibregl.Marker({ element: makeMarkerEl('#58a6ff') })
+      .setLngLat([lng, lat]).addTo(map);
     const inp = document.getElementById('inputB');
     inp.value = label;
     inp.className = 'addr-input set-b';
     inp.blur();
   }
   updateTip();
-  map.panTo([lat, lng], {animate: true});
+  map.panTo([lng, lat], { animate: true });
 }
 
 async function reverseGeocode(lat, lng, which) {
@@ -871,7 +969,6 @@ async function reverseGeocode(lat, lng, which) {
   }
 }
 
-// Close suggestions when clicking outside
 document.addEventListener('mousedown', e => {
   ['A','B'].forEach(w => {
     const wrap = document.getElementById('input' + w)?.closest('.addr-wrap');
@@ -879,9 +976,9 @@ document.addEventListener('mousedown', e => {
   });
 });
 
-// ── Map click ────────────────────────────────────────────────────────
+// ── Map click ─────────────────────────────────────────────────────────
 map.on('click', e => {
-  const {lat, lng} = e.latlng;
+  const { lng, lat } = e.lngLat;
   reverseGeocode(lat, lng, mode);
   if (mode === 'A' && !ptB) setMode('B');
 });
@@ -900,9 +997,13 @@ function updateTip() {
 
 window.clearAll = function() {
   ptA = ptB = null;
-  if (markerA) { map.removeLayer(markerA); markerA = null; }
-  if (markerB) { map.removeLayer(markerB); markerB = null; }
-  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  if (markerA) { markerA.remove(); markerA = null; }
+  if (markerB) { markerB.remove(); markerB = null; }
+  if (hasRoute) {
+    map.getSource('route').setData(emptyFC);
+    map.getSource('route-outline').setData(emptyFC);
+    hasRoute = false;
+  }
   const inpA = document.getElementById('inputA');
   const inpB = document.getElementById('inputB');
   inpA.value = ''; inpA.className = 'addr-input';
@@ -918,20 +1019,23 @@ window.clearAll = function() {
   updateTip();
 }
 
-// ── Hill avoidance ──────────────────────────────────────────────────
-let hillAvoid = false;
+// ── Hill avoidance slider ─────────────────────────────────────────────
+// 0=Casual(max avoidance) … 4=Athletic(no avoidance)
+// Maps to hill_factor 1.0 … 0.0 passed to WASM route()
+const HILL_LABELS = ['Casual', 'Easy', 'Moderate', 'Fit', 'Athletic'];
+let hillFactor = 0.5; // default: Moderate (slider value 2 → factor 0.5)
 
 function setElevStatus(msg) {
   document.getElementById('elevStatus').innerHTML = msg;
 }
 
-window.toggleHill = function() {
-  hillAvoid = !hillAvoid;
-  document.getElementById('hillToggle').classList.toggle('on', hillAvoid);
+window.onHillSlider = function(val) {
+  const v = parseInt(val);
+  hillFactor = (4 - v) / 4; // invert: Casual(0)→1.0, Athletic(4)→0.0
+  document.getElementById('hillLabel').textContent = HILL_LABELS[v];
 };
 
-
-// ── Turn-by-turn directions ──────────────────────────────────────────
+// ── Turn-by-turn directions ───────────────────────────────────────────
 function bearingDeg(a, b) {
   const lat1 = a[1] * Math.PI / 180, lat2 = b[1] * Math.PI / 180;
   const dL = (b[0] - a[0]) * Math.PI / 180;
@@ -967,8 +1071,6 @@ function escHtml(s) {
 
 function buildDirections(path, edgePath, nodes) {
   if (!edgePath.length) return [];
-
-  // Group consecutive edges with same street name into segments
   const segs = [];
   let seg = { name: edgePath[0].n || '', edges: [edgePath[0]], startIdx: 0 };
   for (let i = 1; i < edgePath.length; i++) {
@@ -988,7 +1090,6 @@ function buildDirections(path, edgePath, nodes) {
     const dist = edges.reduce((sum, e) => sum + e.l, 0);
     const ni = startIdx;
     const street = escHtml(name || 'unnamed road');
-
     let action, icon;
     if (s === 0) {
       const bear = bearingDeg(nodes[path[0]], nodes[path[1]]);
@@ -1003,7 +1104,6 @@ function buildDirections(path, edgePath, nodes) {
       action = `${labels[turn]} onto <span class="dir-street-name">${street}</span>`;
       icon = icons[turn];
     }
-
     steps.push({ action, icon, dist, lat: nodes[path[ni]][1], lng: nodes[path[ni]][0] });
   }
 
@@ -1031,7 +1131,7 @@ function renderDirections(steps) {
 }
 
 window.panToStep = function(lat, lng) {
-  map.panTo([lat, lng], { animate: true, duration: 0.5 });
+  map.panTo([lng, lat], { animate: true, duration: 500 });
 };
 
 window.toggleSidebar = function() {
@@ -1040,24 +1140,38 @@ window.toggleSidebar = function() {
   const opening = !sidebar.classList.contains('open');
   sidebar.classList.toggle('open', opening);
   backdrop.classList.toggle('open', opening);
-  if (!opening) map.invalidateSize();
+  if (!opening) map.resize();
 };
 
 window.closeSidebar = function() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebar-backdrop').classList.remove('open');
-  map.invalidateSize();
+  map.resize();
 };
+
+let printMapImg = null;
 
 window.exportPDF = function() {
-  window.print();
+  // Show labels at all zoom levels for the snapshot, then restore
+  map.setLayerZoomRange('road-labels', 0, 24);
+  map.triggerRepaint();
+  // Two rAF calls: first schedules the render, second fires after it completes
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const dataUrl = map.getCanvas().toDataURL('image/png');
+    map.setLayerZoomRange('road-labels', 13, 24);
+    printMapImg = document.createElement('img');
+    printMapImg.src = dataUrl;
+    printMapImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:100;display:block;';
+    document.getElementById('map').appendChild(printMapImg);
+    setTimeout(() => window.print(), 150);
+  }));
 };
 
-window.addEventListener('beforeprint', () => {
-  map.invalidateSize();
+window.addEventListener('afterprint', () => {
+  if (printMapImg) { printMapImg.remove(); printMapImg = null; }
 });
 
-// ── Route ────────────────────────────────────────────────────────────
+// ── Route ─────────────────────────────────────────────────────────────
 window.runRoute = async function() {
   if (!ptA || !ptB) {
     setStatus('⚠ Place both start and end points first.');
@@ -1069,51 +1183,45 @@ window.runRoute = async function() {
 
   const nodeA = nearest_node(ptA[0], ptA[1]);
   const nodeB = nearest_node(ptB[0], ptB[1]);
-
-  const result = route(nodeA, nodeB, hillAvoid);
+  const result = route(nodeA, nodeB, hillFactor);
 
   if (!result) {
     setStatus('✕ No route found between these points.');
     return;
   }
 
-  if (routeLayer) map.removeLayer(routeLayer);
-
   const { path, edgePath } = result;
 
-  // Build route geometry from node coords
-  const routeCoords = path.map(id => {
-    const c = nodes[id];
-    return [c[1], c[0]];
+  // Update route GeoJSON sources
+  map.getSource('route-outline').setData({
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: path.map(id => nodes[id]) },
+    properties: {}
   });
+  map.getSource('route').setData({
+    type: 'FeatureCollection',
+    features: edgePath.map((e, i) => ({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: [nodes[path[i]], nodes[path[i + 1]]] },
+      properties: { s: e.s, n: e.n || '', g: e.g ?? 0, l: e.l }
+    }))
+  });
+  hasRoute = true;
 
-  // Segment coloring by stress
-  const routeLines = [];
-  for (let i = 0; i < edgePath.length; i++) {
-    const e = edgePath[i];
-    const from = nodes[path[i]];
-    const to = nodes[path[i+1]];
-    const s = e.s;
-    const grade = (e.g ?? 0) * 100;
-    const gradeStr = ' · ' + grade.toFixed(1) + '% grade';
-    routeLines.push(L.polyline([[from[1],from[0]], [to[1],to[0]]], {
-      color: stressColors[s] || '#3d8bff',
-      weight: 5,
-      opacity: 0.95,
-    }).bindTooltip((e.n || 'unnamed') + ' · LTS ' + s + gradeStr, {sticky: true}));
+  // Fit bounds
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+  for (const id of path) {
+    const [lng, lat] = nodes[id];
+    if (lng < minLng) minLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lng > maxLng) maxLng = lng;
+    if (lat > maxLat) maxLat = lat;
   }
-
-  // White outline
-  const outline = L.polyline(routeCoords, {color:'white', weight:8, opacity:0.25});
-
-  routeLayer = L.layerGroup([outline, ...routeLines]).addTo(map);
-  map.fitBounds(L.polyline(routeCoords).getBounds(), {padding:[40,40]});
+  map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 40 });
 
   // Stats
-  let totalLen = 0, lts1 = 0, lts3 = 0;
-  let maxGrade = 0, steepLen = 0;
-  for (let i = 0; i < edgePath.length; i++) {
-    const e = edgePath[i];
+  let totalLen = 0, lts1 = 0, lts3 = 0, maxGrade = 0, steepLen = 0;
+  for (const e of edgePath) {
     totalLen += e.l;
     if (e.s === 1) lts1 += e.l;
     if (e.s === 3) lts3 += e.l;
@@ -1123,9 +1231,9 @@ window.runRoute = async function() {
   }
   const lts1pct = (lts1/totalLen*100).toFixed(0);
   const lts3pct = (lts3/totalLen*100).toFixed(0);
-  const distKm = (totalLen/1000).toFixed(2);
-  const distMi = (totalLen/1609.34).toFixed(2);
-  const eta = Math.round(totalLen / (10 * 1609.34 / 60)); // 10 mph
+  const distKm  = (totalLen/1000).toFixed(2);
+  const distMi  = (totalLen/1609.34).toFixed(2);
+  const eta     = Math.round(totalLen / (10 * 1609.34 / 60)); // 10 mph
   const steepPct = (steepLen/totalLen*100).toFixed(0);
 
   document.getElementById('results').innerHTML = `
@@ -1143,12 +1251,8 @@ window.runRoute = async function() {
   if (window.innerWidth <= 640) closeSidebar();
 }
 
-function setStatus(msg) {
-  document.getElementById('status').innerHTML = msg;
-}
-function clearStatus() {
-  document.getElementById('status').innerHTML = '';
-}
+function setStatus(msg) { document.getElementById('status').innerHTML = msg; }
+function clearStatus()  { document.getElementById('status').innerHTML = ''; }
 
 updateTip();
 });

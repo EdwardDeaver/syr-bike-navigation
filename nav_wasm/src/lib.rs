@@ -228,9 +228,10 @@ pub fn nearest_node(lat: f64, lng: f64) -> String {
 }
 
 /// Run Dijkstra from `from_id` to `to_id`.
+/// `hill_factor` is 0.0 (ignore hills entirely) → 1.0 (full avoidance penalties).
 /// Returns `{path, edgePath, distM, lengthM}` or `null` if unreachable.
 #[wasm_bindgen]
-pub fn route(from_id: &str, to_id: &str, avoid_hills: bool) -> JsValue {
+pub fn route(from_id: &str, to_id: &str, hill_factor: f64) -> JsValue {
     let g = graph();
     let Some(&start) = g.id_to_idx.get(from_id) else {
         return JsValue::NULL;
@@ -255,7 +256,8 @@ pub fn route(from_id: &str, to_id: &str, avoid_hills: bool) -> JsValue {
             continue;
         }
         for (ei, edge) in g.adj[u as usize].iter().enumerate() {
-            let penalty = if avoid_hills { hill_penalty(edge.grade) } else { 1.0 };
+            // Interpolate: 0.0 = no penalty, 1.0 = full hill_penalty
+            let penalty = 1.0 + (hill_penalty(edge.grade) - 1.0) * hill_factor.clamp(0.0, 1.0);
             let nd = d + edge.cost * penalty;
             let v = edge.to_idx as usize;
             if nd < dist[v] {
