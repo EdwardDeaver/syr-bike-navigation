@@ -609,6 +609,21 @@
 <script type="module">
 import wasmInit, { init as wasmLoad, nearest_node, route } from './pkg/nav_wasm.js';
 
+// ── Prevent CDN gzip encoding on PMTiles range requests ───────────────
+// GitHub Pages (Fastly) sets Content-Encoding: gzip which the browser
+// auto-decompresses, corrupting the byte offsets PMTiles depends on.
+// Sending Accept-Encoding: identity disables that transform.
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(input, init) {
+  const url = typeof input === 'string' ? input
+    : (input instanceof Request ? input.url : '');
+  if (url.includes('.pmtiles')) {
+    init = { ...(init || {}),
+      headers: { ...((init || {}).headers || {}), 'Accept-Encoding': 'identity' } };
+  }
+  return _origFetch(input, init);
+};
+
 // ── PMTiles protocol ──────────────────────────────────────────────────
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
