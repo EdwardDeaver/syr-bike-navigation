@@ -288,7 +288,9 @@ The reversed `edge_seq` then maps directly to the `edgePath` returned to JavaScr
 
 ---
 
-### Hill penalty
+### Hill penalty and fitness slider
+
+The base hill penalty function maps grade to a multiplier:
 
 ```rust
 fn hill_penalty(grade: f64) -> f64 {
@@ -300,14 +302,34 @@ fn hill_penalty(grade: f64) -> f64 {
 }
 ```
 
-| Grade (abs) | Multiplier | Effect |
-|-------------|------------|--------|
-| ≤ 4%        | 1.0×       | No penalty — comfortable cycling |
-| 4–8%        | 1.5×       | Mild penalty — noticeable climb |
-| 8–12%       | 4.0×       | Heavy penalty — steep, most cyclists dismount |
-| > 12%       | 50.0×      | Near-prohibitive — equivalent to 50× the distance |
+| Grade (abs) | Base multiplier | Effect |
+|-------------|-----------------|--------|
+| ≤ 4%        | 1.0×            | No penalty — comfortable cycling |
+| 4–8%        | 1.5×            | Mild penalty — noticeable climb |
+| 8–12%       | 4.0×            | Heavy penalty — steep, most cyclists dismount |
+| > 12%       | 50.0×           | Near-prohibitive — equivalent to 50× the distance |
 
-The penalty is applied to `edge.cost` (the already-LTS-weighted cost), so a >12% hill on an LTS-3 street is penalised 50× on top of the LTS-3 penalty. This almost always routes around such segments even at significant detour cost. The multiplier is only applied when `avoid_hills = true`; otherwise all penalties are 1.0.
+Rather than a simple on/off toggle, the `hill_factor` parameter (0.0–1.0) interpolates between no avoidance and full avoidance:
+
+```rust
+let penalty = 1.0 + (hill_penalty(edge.grade) - 1.0) * hill_factor.clamp(0.0, 1.0);
+```
+
+- `hill_factor = 0.0` → all penalties collapse to 1.0 (hills have no effect on routing)
+- `hill_factor = 1.0` → full `hill_penalty()` values apply
+- `hill_factor = 0.5` → penalties are halfway between 1.0 and the base multiplier
+
+In the UI, this is exposed as a 5-step fitness slider:
+
+| Slider position | Label | `hill_factor` |
+|-----------------|-------|---------------|
+| 0 (leftmost)    | Casual | 1.0 |
+| 1               | Easy | 0.75 |
+| 2 (default)     | Moderate | 0.5 |
+| 3               | Fit | 0.25 |
+| 4 (rightmost)   | Athletic | 0.0 |
+
+The mapping is `hill_factor = (4 - slider_value) / 4`, so moving right toward "Athletic" reduces avoidance.
 
 ---
 
@@ -430,30 +452,32 @@ export function nearest_node(lat, lng) {
 
 ### Loading in the browser
 
-**File:** `index.html` (lines 500–513)
-
-The WASM module is loaded via the ES module import and the default export (the init function) provided by `wasm-pack`:
+The WASM module, graph JSON, and MapLibre map are all initialised in parallel:
 
 ```js
 import wasmInit, { init as wasmLoad, nearest_node, route }
     from './pkg/nav_wasm.js';
 
-// In DOMContentLoaded:
+const mapLoaded = new Promise(resolve => map.once('load', resolve));
+
 const [jsonText] = await Promise.all([
     fetch('./syr_map.json').then(r => r.text()),
-    wasmInit(),   // fetches and instantiates nav_wasm_bg.wasm
+    wasmInit(),     // fetches and instantiates nav_wasm_bg.wasm
+    mapLoaded,      // MapLibre finishes loading style + initial tiles
 ]);
 
 wasmLoad(jsonText);  // parses JSON, builds graph in WASM memory
+// safe to add GeoJSON sources/layers now
 ```
 
-The two operations are parallelised with `Promise.all`:
-- `fetch('./syr_map.json')` downloads the ~1–2 MB graph JSON
-- `wasmInit()` fetches the ~138 KB `.wasm` binary, compiles it to native code in the browser's WASM JIT, and returns
+Three things happen simultaneously:
+- `fetch('./syr_map.json')` downloads the ~2 MB graph JSON
+- `wasmInit()` fetches the ~138 KB `.wasm` binary and compiles it
+- `mapLoaded` waits for MapLibre to load the PMTiles style and fire its `load` event
 
-Both downloads and compilations happen simultaneously. `wasmLoad(jsonText)` (which maps to the Rust `init(json)` function) is only called after both complete, ensuring the WASM module is instantiated before the graph JSON is handed to it.
+GeoJSON sources and layers are only added to the map after all three complete, ensuring the map is ready to receive them. `wasmLoad(jsonText)` is called immediately after, parsing the graph into WASM memory.
 
-`wasmInit()` internally calls `WebAssembly.instantiateStreaming` (or `WebAssembly.instantiate` as fallback), which compiles the `.wasm` binary on a background thread in modern browsers, keeping the main thread unblocked.
+`wasmInit()` internally calls `WebAssembly.instantiateStreaming`, which compiles the `.wasm` binary on a background thread in modern browsers, keeping the main thread unblocked.
 
 ---
 
