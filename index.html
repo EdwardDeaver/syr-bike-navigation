@@ -634,7 +634,7 @@
   </div>
 </div>
 
-<button id="sidebar-fab" onclick="toggleSidebar()" aria-label="Open menu">≡</button>
+<button id="sidebar-fab" onclick="toggleSidebar()" aria-label="Open menu">⚙</button>
 
 <!-- PMTiles fetch patch (disabled — GitHub Pages CDN gzip issue)
      Re-enable alongside pmtiles.js when self-hosted tiles are working.
@@ -948,6 +948,7 @@ function placePoint(which, lat, lng, label) {
   }
   updateTip();
   map.panTo([lng, lat], { animate: true });
+  if (ptA && ptB) runRoute();
 }
 
 async function reverseGeocode(lat, lng, which) {
@@ -1267,6 +1268,13 @@ window.runRoute = async function() {
   renderDirections(buildDirections(path, edgePath, nodes));
   clearStatus();
   if (window.innerWidth <= 640) closeSidebar();
+
+  // Toast hint pointing to the gear
+  const tip = document.getElementById('tip');
+  tip.textContent = '⚙ Tap the gear for directions & options';
+  tip.style.opacity = '1';
+  clearTimeout(tip._toastTimer);
+  tip._toastTimer = setTimeout(() => { tip.style.opacity = '0'; }, 4000);
 }
 
 function setStatus(msg) { document.getElementById('status').innerHTML = msg; }
