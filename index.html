@@ -866,7 +866,7 @@ function renderSuggestions(which) {
     const name = p.name || p.street || p.city || 'Unknown';
     const detail = [p.housenumber, p.street, p.city, p.state]
       .filter(Boolean).join(', ');
-    return `<div class="suggestion-item" data-idx="${i}" onmousedown="selectSuggestion('${which}',${i})">
+    return `<div class="suggestion-item" data-idx="${i}" onclick="selectSuggestion('${which}',${i})">
       <div class="sug-name">${name}</div>
       ${detail ? `<div class="sug-detail">${detail}</div>` : ''}
     </div>`;
