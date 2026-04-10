@@ -576,6 +576,7 @@
     <span class="header-tagline">Find the Lowest Stress Route</span>
   </div>
   <span class="badge">BNA · Jan 2025</span>
+  <div id="kofi-btn" style="margin-left:auto;flex-shrink:0"><script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script><script type='text/javascript'>kofiwidget2.init('Buy me a coffee', '#72a4f2', 'D1D3H1G09');kofiwidget2.draw();</script> </div>
 </header>
 
 <div id="sidebar-backdrop" onclick="closeSidebar()"></div>
@@ -631,6 +632,11 @@
         <button class="toggle" id="stressToggle" onclick="toggleStress()"></button>
       </div>
 
+      <div class="toggle-row">
+        <span class="toggle-label">Show coverage boundary</span>
+        <button class="toggle" id="boundaryToggle" onclick="toggleBoundary()"></button>
+      </div>
+
       <div class="stress-legend">
         <div class="legend-item">
           <div class="legend-swatch" style="background:var(--lts1)"></div>
@@ -674,6 +680,7 @@
         Grade data: SRTM30m via OpenTopoData (baked in).<br>
         Data: <a href="https://cityratings.peopleforbikes.org/cities/syracuse-ny" target="_blank">PeopleForBikes BNA, Jan 2025</a>.<br>
         15,164 nodes · 34,497 directed edges.
+        Created by: <a href="https://www.edwarddeaver.me" target="_blank">Edward Deaver</a>.
       </div>
 
     </div>
@@ -804,6 +811,29 @@ const emptyFC = { type: 'FeatureCollection', features: [] };
 map.addSource('stress',        { type: 'geojson', data: emptyFC });
 map.addSource('route-outline', { type: 'geojson', data: emptyFC });
 map.addSource('route',         { type: 'geojson', data: emptyFC });
+map.addSource('boundary',      { type: 'geojson', data: emptyFC });
+
+// ── Coverage boundary layers ──────────────────────────────────────────
+map.addLayer({
+  id: 'boundary-fill', type: 'fill', source: 'boundary',
+  layout: { visibility: 'none' },
+  paint: { 'fill-color': '#1a73e8', 'fill-opacity': 0.02 }
+});
+map.addLayer({
+  id: 'boundary-outline', type: 'line', source: 'boundary',
+  layout: { visibility: 'none' },
+  paint: {
+    'line-color': '#1a73e8',
+    'line-width': 1.5,
+    'line-opacity': 0.5,
+    'line-dasharray': [4, 3]
+  }
+});
+
+fetch('./boundary.geojson')
+  .then(r => r.json())
+  .then(data => map.getSource('boundary').setData(data))
+  .catch(() => {}); // silently ignore if file missing
 
 // ── Stress overlay layer ──────────────────────────────────────────────
 map.addLayer({
@@ -875,6 +905,17 @@ window.toggleStress = function() {
   map.setLayoutProperty('stress-lines', 'visibility', stressVisible ? 'visible' : 'none');
 };
 
+// ── Boundary toggle ───────────────────────────────────────────────────
+let boundaryVisible = false;
+
+window.toggleBoundary = function() {
+  boundaryVisible = !boundaryVisible;
+  document.getElementById('boundaryToggle').classList.toggle('on', boundaryVisible);
+  const vis = boundaryVisible ? 'visible' : 'none';
+  map.setLayoutProperty('boundary-fill',    'visibility', vis);
+  map.setLayoutProperty('boundary-outline', 'visibility', vis);
+};
+
 // ── State ─────────────────────────────────────────────────────────────
 let mode = 'A';
 let ptA = null, ptB = null;
@@ -897,13 +938,17 @@ window.onAddrInput = function onAddrInput(which, val) {
 
 async function fetchSuggestions(which, query) {
   const params = new URLSearchParams({
-    q: query, limit: 6, lang: 'en',
+    q: query, limit: 10, lang: 'en',
     lat: 43.048, lon: -76.147,
+    bbox: '-79.762,40.496,-71.856,45.016', // NY state bounds
   });
   try {
     const resp = await fetch(PHOTON_URL + '?' + params);
     const data = await resp.json();
-    suggestionData[which] = data.features || [];
+    const features = (data.features || [])
+      .filter(f => f.properties.state === 'New York')
+      .slice(0, 6);
+    suggestionData[which] = features;
     activeSugIdx[which] = -1;
     renderSuggestions(which);
   } catch(e) { /* silently ignore */ }
@@ -915,9 +960,10 @@ function renderSuggestions(which) {
   if (!items.length) { closeSuggestions(which); return; }
   box.innerHTML = items.map((f, i) => {
     const p = f.properties;
-    const name = p.name || p.street || p.city || 'Unknown';
-    const detail = [p.housenumber, p.street, p.city, p.state]
-      .filter(Boolean).join(', ');
+    const name = p.housenumber
+      ? `${p.housenumber} ${p.street || p.name || ''}`
+      : (p.name || p.street || p.city || 'Unknown');
+    const detail = [p.city, p.state].filter(Boolean).join(', ');
     return `<div class="suggestion-item" data-idx="${i}" onclick="selectSuggestion('${which}',${i})">
       <div class="sug-name">${name}</div>
       ${detail ? `<div class="sug-detail">${detail}</div>` : ''}
@@ -964,7 +1010,10 @@ window.selectSuggestion = function selectSuggestion(which, idx) {
   if (!feat) return;
   const [lng, lat] = feat.geometry.coordinates;
   const p = feat.properties;
-  const label = [p.name || p.street, p.housenumber, p.city].filter(Boolean).join(' ').trim()
+  const street = p.housenumber
+    ? `${p.housenumber} ${p.street || p.name || ''}`
+    : (p.name || p.street || '');
+  const label = [street, p.city].filter(Boolean).join(', ').trim()
     || (lat.toFixed(5) + ', ' + lng.toFixed(5));
   placePoint(which, lat, lng, label);
   closeSuggestions(which);
@@ -1342,5 +1391,6 @@ updateTip();
 });
 
 </script>
+
 </body>
 </html>
