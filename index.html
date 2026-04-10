@@ -1031,6 +1031,7 @@ window.onHillSlider = function(val) {
   const v = parseInt(val);
   hillFactor = (4 - v) / 4; // invert: Casual(0)→1.0, Athletic(4)→0.0
   document.getElementById('hillLabel').textContent = HILL_LABELS[v];
+  if (ptA && ptB) runRoute();
 };
 
 // ── Turn-by-turn directions ───────────────────────────────────────────
