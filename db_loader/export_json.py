@@ -55,9 +55,13 @@ def main():
     # ── edges ────────────────────────────────────────────────────────────
     print("Loading edges …")
     edge_rows = con.execute("""
-        SELECT from_id, to_id, cost, stress, length_m, name, grade
-        FROM   edges
-        ORDER  BY from_id
+        SELECT e.from_id, e.to_id, e.cost, e.stress, e.length_m, e.name, e.grade
+        FROM   edges e
+        WHERE  NOT EXISTS (
+            SELECT 1 FROM excluded_edges x
+            WHERE x.from_id = e.from_id AND x.to_id = e.to_id
+        )
+        ORDER  BY e.from_id
     """).fetchall()
 
     graph: dict[str, list] = {}
