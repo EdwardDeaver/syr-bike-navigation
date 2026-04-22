@@ -2,7 +2,7 @@
 
 A static web app that finds the least-stressful cycling route between two points in Syracuse, NY. Routing runs entirely in the browser using a Rust navigation engine compiled to WebAssembly — no server required.
 
-**Live:** [dev.edwarddeaver.me/syr-bike-navigation](https://dev.edwarddeaver.me/syr-bike-navigation)
+**Live:** [https//syrbikemaps.com](https//syrbikemaps.com)
 
 ---
 
